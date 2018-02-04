@@ -1,2 +1,10 @@
+# CMake
+cmake-build-debug/
+cmake-build-release/
+
+# Idea
+.idea
+
+# Object
 network
 network.core

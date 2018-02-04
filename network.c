@@ -8,23 +8,17 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define ERROR (-1)
 #define MAX_DATA 512
+#define ERROR (-1)
 
 void main(int argc, char **argv){
-    int sockfd, clientfd;
+    int sockfd;
+    int clientfd;
     struct sockaddr_in server, client;
     socklen_t len;
     char data[MAX_DATA];
     char msg[] = "Message Sent\n";
-    ssize_t bytes_sent, data_len;
     int tr=1;
-
-    // Creating Socket
-    if((sockfd = socket(PF_INET, SOCK_STREAM, 0)) == ERROR){
-        perror("Socket error");
-        exit(ERROR);
-    }
 
     // Assigning addresses
     server.sin_family = PF_INET;            // IPv4
@@ -34,54 +28,78 @@ void main(int argc, char **argv){
 
     len = sizeof(struct sockaddr_in);
 
-    // Kill "Address already in use" error message
+
+    /* Success Condition: socket(2) */
+    if((sockfd = socket(PF_INET, SOCK_STREAM, 0)) == ERROR){
+        perror("Socket error");
+        exit(ERROR);
+    }
+
+    /* Failure Condition: socket(2) */
+    socket(ERROR, SOCK_STREAM, 0);
+
+
+    /* Success Condition: setsockopt(2) */
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, sizeof(int)) == ERROR) {
         perror("setsockopt");
         exit(ERROR);
     }
 
-    // Bind to the address
+    /* Failure Condition: setsockopt(2) */
+    setsockopt(ERROR, SOL_SOCKET, SO_REUSEADDR, &tr, sizeof(int));
+
+
+    /* Success Condition: bind(2) */
     if((bind(sockfd, (struct sockaddr *)&server, (socklen_t) len)) == ERROR){
         perror("Bind error");
         exit(ERROR);
     }
 
-    //Listen for connections
+    /* Failure Condition: bind(2) */
+    bind(ERROR, (struct sockaddr *)&server, (socklen_t) len);
+
+
+    /* Success Condition: listen(2) */
     if((listen(sockfd, 1)) == ERROR){
         perror("Listen error");
         exit(ERROR);
     }
 
-    // Accept connection from a client and return the new socket
+    /* Failure Condition: listen(2) */
+    listen(ERROR, 1);
+
+
+    /* Success Condition: accept(2) */
     if((clientfd = accept(sockfd, (struct sockaddr *)&client, &len)) == ERROR){
         perror("Accept error");
         exit(ERROR);
     }
 
-    // Print the connection information
-    printf("New client connected from port no %d and IP %s\n",
-           ntohs(client.sin_port), inet_ntoa(client.sin_addr));
+    /* Failure Condition: accept(2) */
+    accept(ERROR, (struct sockaddr *)&client, &len);
 
-    // Send the message after connection completes
-    if((bytes_sent = send(clientfd, msg, strlen(msg), 0)) == ERROR){
+
+    /* Success Condition: send(2) */
+    if((send(clientfd, msg, strlen(msg), 0)) == ERROR){
         perror("Send error");
         exit(ERROR);
     }
 
-    printf("Sent %d bytes to Client %s\n",
-           (int) bytes_sent, inet_ntoa(client.sin_addr));
-
-    // Keep sending the same data till no response from client
-    data_len = recv(clientfd, data, MAX_DATA , 0);
-
-    if(data_len){
-        send(clientfd, data, (size_t) data_len, 0);
-        data[data_len] = '\0';
-        printf("Sent message: %s\n", data);
-    }
+    /* Failure Condition: send(2) */
+    send(ERROR, msg, strlen(msg), 0);
 
 
-    printf("Client disconnected\n");
+    /* Failure Condition: recv(2) */
+    recv(ERROR, data, MAX_DATA , 0);
+
+    /* Success Condition: recv(2) */
+    if((recv(clientfd, data, MAX_DATA , 0)) == ERROR){
+        perror("Recv error");
+        exit(ERROR);
+    };
+
+
+    /* TODO: Implement sendto(2), recvfrom(2), connect(2) here */
 
     // Close the connection
     close(clientfd);

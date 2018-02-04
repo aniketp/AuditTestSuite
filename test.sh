@@ -42,8 +42,6 @@ start_audit()
 }
 
 
-
-
 # Stop Audit daemon
 stop_audit()
 {
@@ -56,7 +54,53 @@ stop_audit()
 # Catch the currently active trail, for later use
 catch_trail()
 {
-    auditdir=$(fetch_auditdir)
-    current_trail=$(ls ${auditdir} | grep ".not_terminated")
+    local auditdir=$(fetch_auditdir)
+    local current_trail=$(ls ${auditdir} | grep ".not_terminated")
+    return ${current_trail}
 
+}
+
+
+# Execute the network binary and connect using telnet
+launch_syscalls()
+{
+    if [ -f "${PWD}/network" ]; then
+        echo "Please run 'make' first"
+    fi
+
+    # Launch network system calls
+    if ! (./network &) &> /dev/null
+    then
+        echo "Failed to execute network binary"
+        exit 1
+    fi
+
+    # Connect to the socket
+    local client='telnet localhost 9000 | echo \"message\"'
+    eval ${client}
+
+}
+
+test_syscalls()
+{
+    local auditdir=$1
+}
+
+
+# Main function to launch all the functions above
+main()
+{
+    enable_audit
+    set_flag
+    start_audit
+    trail=$(catch_trail)
+    auditdir=$(fetch_auditdir)
+    launch_syscalls
+    stop_audit
+
+    # Fetch the trail corresponding to trail catched earlier
+    init_name=$(echo ${trail} | cut -d '.' -f 1)
+    main_trail=$(ls ${auditdir} | grep ${init_name})
+
+    test_syscalls ${main_trail}
 }

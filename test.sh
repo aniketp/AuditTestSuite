@@ -65,8 +65,7 @@ launch_syscalls()
     #fi
 
     # Launch network system calls
-    local launch="../audit/network &"
-    eval ${launch}
+    ./network &
     echo "launching system calls..."
     #if [ ! $(./network &) ]
     #then
@@ -75,8 +74,7 @@ launch_syscalls()
     #fi
 
     # Connect to the socket
-    local client='telnet localhost 9000 | echo \"message\"'
-    eval ${client}
+    telnet localhost 9000 | echo "message"
     echo "Connected via client"
 
     return
@@ -93,12 +91,9 @@ test_syscalls()
     # and failure condition of each syscall
 
     for syscall in $syscalls; do
-        pass=false; fail=false
         echo "Testing ${syscall}.."
 
-        for line in $(praudit -l ${fullpath}); do
-            find_syscall=$(echo ${line} | grep "${syscall}")
-
+        praudit -l ${fullpath} | grep ${syscall} | while read -r find_syscall; do
             if [ "$find_syscall" != "" ]; then
                 # Check for success and failure mode
                 check_success=$(echo ${find_syscall} | grep "return,success")
@@ -107,29 +102,29 @@ test_syscalls()
                 # Can add tests for arguments, file descriptors etc
 
                 # Check if already tested both modes
-                if [ "$pass" = true ] && [ "$fail" = true ]; then
+                if [ "$pass" = 1 ] && [ "$fail" = 1 ]; then
                     break
                 fi
 
                 if [ "$check_success" != "" ]; then
                     echo "Success mode passed: ${syscall}"
-                    pass=true
+                    pass=1
                 fi
 
                 if [ "$check_failure" != "" ]; then
                     echo "Failure mode passed: ${syscall}"
-                    fail=true
+                    fail=1
                 fi
             fi
 
         done
 
         # Check if both modes passed
-        if [ "$pass" = false ]; then
+        if [ "$pass" = 0 ]; then
             echo "Success mode failed: ${syscall}"
         fi
 
-        if [ "$fail" = false ]; then
+        if [ "$fail" = 0 ]; then
             echo "Failure mode failed: ${syscall}"
         fi
 
@@ -143,8 +138,8 @@ test_syscalls()
 # Main function to launch all the functions above
 main()
 {
-    enable_audit
-    set_flag
+#    enable_audit
+#    set_flag
     start_audit
     launch_syscalls
 

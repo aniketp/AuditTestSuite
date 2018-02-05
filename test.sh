@@ -10,11 +10,10 @@ syscalls="socket(2) setsockopt(2) bind(2) listen(2)
 
 # Fetches the location of Audit trails
 # Default: /var/audit
-fetch_auditdir()
-{
-    local dir=$(cat ${audit_control} | grep "dir:" | cut -d ':' -f 2)
-    return dir
-}
+auditdir=$(cat ${audit_control} | grep "dir:" | cut -d ':' -f 2)
+
+# Catch the currently active trail, for later use
+current_trail=$(ls ${auditdir} | grep ".not_terminated")
 
 
 # Inserts auditd_enable="YES" in /etc/rc.conf
@@ -56,16 +55,6 @@ stop_audit()
 }
 
 
-# Catch the currently active trail, for later use
-catch_trail()
-{
-    fetch_auditdir; local auditdir=$?
-    local current_trail=$(ls ${auditdir} | grep ".not_terminated")
-    return ${current_trail}
-
-}
-
-
 # Execute the network binary and connect using telnet
 launch_syscalls()
 {
@@ -74,22 +63,24 @@ launch_syscalls()
     fi
 
     # Launch network system calls
-    if ! (./network &) &> /dev/null
-    then
-        echo "Failed to execute network binary"
-        exit 1
-    fi
+    local launch="./network &"
+    eval ${launch}
+    #if [ ! $(./network &) ]
+    #then
+    #    echo "Failed to execute network binary"
+    #    exit 1
+    #fi
 
     # Connect to the socket
     local client='telnet localhost 9000 | echo \"message\"'
     eval ${client}
 
+    return
 }
 
 test_syscalls()
 {
 
-    fetch_auditdir; local auditdir=$?
     local main_trail=$1
 
     local fullpath="${auditdir}/${main_trail}"
@@ -153,14 +144,13 @@ main()
     start_audit
     launch_syscalls
 
-    catch_trail; local trail=$?
-    fetch_auditdir; local auditdir=$?
-
     # Fetch the trail corresponding to trail catched earlier
-    local init_name=$(echo ${trail} | cut -d '.' -f 1)
+    local init_name=$(echo ${current_trail} | cut -d '.' -f 1)
     local main_trail=$(ls ${auditdir} | grep ${init_name})
 
     stop_audit
     test_syscalls ${main_trail}
     # TODO: Implement cleanup
+
+    return
 }

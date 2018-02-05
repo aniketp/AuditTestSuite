@@ -151,9 +151,8 @@ main()
     # Fetch the trail corresponding to trail catched earlier
     local current_trail=$(ls ${auditdir} | grep ".not_terminated")
     local init_name=$(echo ${current_trail} | cut -d '.' -f 1)
-    local main_trail=$(ls ${auditdir} | grep ${init_name})
-
     stop_audit
+    local main_trail=$(ls ${auditdir} | grep ${init_name})
     test_syscalls ${main_trail}
     # TODO: Implement cleanup
 

@@ -60,7 +60,7 @@ stop_audit()
 # Execute the network binary and connect using telnet
 launch_syscalls()
 {
-    if [ ! -f ../audit/network ]; then
+    if [ ! -f network ]; then
         echo "Please run 'make' first .. ✘"
         stop_audit
         exit 1

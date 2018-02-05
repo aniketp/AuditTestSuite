@@ -11,9 +11,7 @@ syscalls="socket(2) setsockopt(2) bind(2) listen(2)
 # Fetches the location of Audit trails
 # Default: /var/audit
 auditdir=$(cat ${audit_control} | grep "dir:" | cut -d ':' -f 2)
-
-# Catch the currently active trail, for later use
-current_trail=$(ls ${auditdir} | grep ".not_terminated")
+echo "Audit Directory: ${auditdir}"
 
 
 # Inserts auditd_enable="YES" in /etc/rc.conf
@@ -145,6 +143,7 @@ main()
     launch_syscalls
 
     # Fetch the trail corresponding to trail catched earlier
+    local current_trail=$(ls ${auditdir} | grep ".not_terminated")
     local init_name=$(echo ${current_trail} | cut -d '.' -f 1)
     local main_trail=$(ls ${auditdir} | grep ${init_name})
 

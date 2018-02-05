@@ -20,6 +20,7 @@ enable_audit()
 {
     sed -i "" '/auditd_enable/d' "$audit_daemon"
     echo "auditd_enable=\"YES\"" >> "$audit_daemon"
+    echo "Audit daemon configured"
     return
 }
 
@@ -28,6 +29,7 @@ enable_audit()
 set_flag()
 {
     sed -i "" '/\<flags:/s/\(.*\)/flags:nt/' "$audit_control"
+    echo "Associated flag set: (nt)"
     return
 }
 
@@ -40,6 +42,7 @@ start_audit()
     local newt="audit -n"
 
     eval ${init}; eval ${newt}
+    echo "Audit daemon and new trail started"
     return
 }
 
@@ -49,6 +52,7 @@ stop_audit()
 {
     local stop="audit -t"
     eval ${stop}
+    echo "Audit daemon stopped"
     return
 }
 
@@ -56,13 +60,14 @@ stop_audit()
 # Execute the network binary and connect using telnet
 launch_syscalls()
 {
-    if [ -f "${PWD}/network" ]; then
-        echo "Please run 'make' first"
-    fi
+    #if [ -f "${PWD}/network" ]; then
+    #    echo "Please run 'make' first"
+    #fi
 
     # Launch network system calls
-    local launch="./network &"
+    local launch="../audit/network &"
     eval ${launch}
+    echo "launching system calls..."
     #if [ ! $(./network &) ]
     #then
     #    echo "Failed to execute network binary"
@@ -72,6 +77,7 @@ launch_syscalls()
     # Connect to the socket
     local client='telnet localhost 9000 | echo \"message\"'
     eval ${client}
+    echo "Connected via client"
 
     return
 }

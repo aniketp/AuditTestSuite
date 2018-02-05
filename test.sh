@@ -1,7 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 audit_control="/etc/security/audit_control"
 audit_daemon='/etc/rc.conf'
+
+# Array containing all network system calls to be tested
+syscalls="socket(2) setsockopt(2) bind(2) listen(2)
+           accept(2) sendto(2) recvfrom(2)"
+
 
 # Fetches the location of Audit trails
 # Default: /var/audit
@@ -54,7 +59,7 @@ stop_audit()
 # Catch the currently active trail, for later use
 catch_trail()
 {
-    local auditdir=$(fetch_auditdir)
+    fetch_auditdir; local auditdir=$?
     local current_trail=$(ls ${auditdir} | grep ".not_terminated")
     return ${current_trail}
 
@@ -83,7 +88,60 @@ launch_syscalls()
 
 test_syscalls()
 {
-    local auditdir=$1
+
+    fetch_auditdir; local auditdir=$?
+    local main_trail=$1
+
+    local fullpath="${auditdir}/${main_trail}"
+
+    # Loop through the lines of $fullpath and check success
+    # and failure condition of each syscall
+
+    for syscall in $syscalls; do
+        pass=false; fail=false
+        echo "Testing ${syscall}.."
+
+        for line in $(praudit -l ${fullpath}); do
+            find_syscall=$(echo ${line} | grep "${syscall}")
+
+            if [ "$find_syscall" != "" ]; then
+                # Check for success and failure mode
+                check_success=$(echo ${find_syscall} | grep "return,success")
+                check_failure=$(echo ${find_syscall} | grep "return,failure")
+
+                # Can add tests for arguments, file descriptors etc
+
+                # Check if already tested both modes
+                if [ "$pass" = true ] && [ "$fail" = true ]; then
+                    break
+                fi
+
+                if [ "$check_success" != "" ]; then
+                    echo "Success mode passed: ${syscall}"
+                    pass=true
+                fi
+
+                if [ "$check_failure" != "" ]; then
+                    echo "Failure mode passed: ${syscall}"
+                    fail=true
+                fi
+            fi
+
+        done
+
+        # Check if both modes passed
+        if [ "$pass" = false ]; then
+            echo "Success mode failed: ${syscall}"
+        fi
+
+        if [ "$fail" = false ]; then
+            echo "Failure mode failed: ${syscall}"
+        fi
+
+        # TODO: Print statistics
+    done
+
+    return
 }
 
 
@@ -93,14 +151,16 @@ main()
     enable_audit
     set_flag
     start_audit
-    trail=$(catch_trail)
-    auditdir=$(fetch_auditdir)
     launch_syscalls
-    stop_audit
+
+    catch_trail; local trail=$?
+    fetch_auditdir; local auditdir=$?
 
     # Fetch the trail corresponding to trail catched earlier
-    init_name=$(echo ${trail} | cut -d '.' -f 1)
-    main_trail=$(ls ${auditdir} | grep ${init_name})
+    local init_name=$(echo ${trail} | cut -d '.' -f 1)
+    local main_trail=$(ls ${auditdir} | grep ${init_name})
 
+    stop_audit
     test_syscalls ${main_trail}
+    # TODO: Implement cleanup
 }

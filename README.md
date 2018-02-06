@@ -9,10 +9,15 @@ Clone the repository,
  $ git clone git@github.com:aniketp/AuditTestSuite.git audit
 ```
 
+Setup the necessary values in configuration files
+```bash
+ $ ./setup
+```
+
 And execute the testing script.
 ```bash
  $ make
- $ ./test.sh
+ $ ./test
 ```
 
 ### Testing Status

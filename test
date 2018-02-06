@@ -14,26 +14,6 @@ auditdir=$(cat ${audit_control} | grep "dir:" | cut -d ':' -f 2)
 echo "Audit Directory: ${auditdir} .. ✔"
 
 
-# Inserts auditd_enable="YES" in /etc/rc.conf
-# if not already done
-enable_audit()
-{
-    sed -i "" '/auditd_enable/d' "$audit_daemon"
-    echo "auditd_enable=\"YES\"" >> "$audit_daemon"
-    echo "Audit daemon configured .. ✔"
-    return
-}
-
-
-# Set flags as network(nt) audit_class
-set_flag()
-{
-    sed -i "" '/\<flags:/s/\(.*\)/flags:lo,nt/' "$audit_control"
-    echo "Set Associated flag: (nt) .. ✔"
-    return
-}
-
-
 # Start audit daemon and catch the generated trails
 start_audit()
 {
@@ -132,7 +112,7 @@ test_syscalls()
 
 cleanup()
 {
-    echo '\nCleaning up test trails .. ✔'
+    echo 'Cleaning up test trails ..'
     rm -f "$auditdir/$1"
     return
 }
@@ -141,8 +121,7 @@ cleanup()
 # Main function to launch all the functions above
 main()
 {
-    enable_audit
-    set_flag
+
     start_audit
     launch_syscalls
 

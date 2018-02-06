@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# Script to setup the testing environment
+
+audit_control="/etc/security/audit_control"
+audit_daemon='/etc/rc.conf'
+
+# Inserts auditd_enable="YES" in /etc/rc.conf
+# if not already done
+enable_audit()
+{
+    sed -i "" '/auditd_enable/d' "$audit_daemon"
+    echo "auditd_enable=\"YES\"" >> "$audit_daemon"
+    echo "Audit daemon configured .. ✔"
+    return
+}
+
+# Set flags as network(nt) audit_class
+set_flag()
+{
+    sed -i "" '/\<flags:/s/\(.*\)/flags:lo,nt/' "$audit_control"
+    echo "Set Associated flag: (nt) .. ✔"
+    return
+}
+
+set_flag
+enable_audit

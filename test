@@ -67,7 +67,7 @@ test_syscalls()
     # Loop through the lines of $fullpath and check success
     # and failure condition of each syscall
 
-    for syscall in $syscalls; do
+    for syscall in ${syscalls}; do
         echo "Testing ${syscall}.."
 
         praudit -l ${fullpath} | grep ${syscall} | while read -r find_syscall; do
@@ -94,7 +94,7 @@ test_syscalls()
 
         done
 
-        # Check if both modes passed
+        # Check if both modes failed
         if [ "$pass" = 0 ]; then
             echo "Success mode failed: ${syscall} .. ✘"
         fi
@@ -132,7 +132,7 @@ main()
 
     local main_trail=$(ls ${auditdir} | grep ${init_name})
     test_syscalls ${main_trail}
-    cleanup main_trail
+    cleanup ${main_trail}
 
     return
 }

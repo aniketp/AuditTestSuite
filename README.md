@@ -22,7 +22,7 @@ And execute the testing script.
 
 ### Testing Status
 
-Current scenario: All the 7 included tests are passing in both *Success* and *Failure* modes.
+Current scenario: All the 8 included tests are passing in both *Success* and *Failure* modes.
 
 |  Num  |	Syscall	 |  Status
 |:-----:|:---------:|:-----------------:
@@ -34,6 +34,6 @@ Current scenario: All the 7 included tests are passing in both *Success* and *Fa
 6       |sendto(2)		|:white_check_mark:
 7       |recvfrom(2)	|:white_check_mark:
 8       |shutdown(2)	| (TBD)
-9       |connect(2)     | (TBD)
+9       |connect(2)     |:white_check_mark:
 10      |sendmsg(2)     | (TBD)
 11      |recvmsg(2)     | (TBD)

@@ -5,7 +5,7 @@ audit_daemon='/etc/rc.conf'
 
 # Array containing all network system calls to be tested
 syscalls="socket(2) setsockopt(2) bind(2) listen(2)
-accept(2) sendto(2) recvfrom(2)"
+          accept(2) sendto(2) recvfrom(2) connect(2)"
 
 
 # Fetches the location of Audit trails

@@ -5,7 +5,7 @@ audit_daemon='/etc/rc.conf'
 
 # Array containing all network system calls to be tested
 syscalls="socket(2) setsockopt(2) bind(2) listen(2)
-           accept(2) sendto(2) recvfrom(2)"
+accept(2) sendto(2) recvfrom(2)"
 
 
 # Fetches the location of Audit trails
@@ -57,6 +57,8 @@ launch_syscalls()
     return
 }
 
+text="test.txt"
+
 test_syscalls()
 {
 
@@ -69,6 +71,8 @@ test_syscalls()
 
     for syscall in ${syscalls}; do
         echo "Testing ${syscall}.."
+        success_mode="Success mode passed: ${syscall}"
+        failure_mode="Failure mode passed: ${syscall}"
 
         praudit -l ${fullpath} | grep ${syscall} | while read -r find_syscall; do
             # Check for success and failure mode
@@ -77,29 +81,28 @@ test_syscalls()
 
             # Can add tests for arguments, file descriptors etc
 
-            # Check if already tested both modes
-            if [ "$pass" = 1 ] && [ "$fail" = 1 ]; then
-                break
-            fi
-
             if [ "$check_success" != "" ] && [ "$pass_once" != 1 ]; then
-                echo "Success mode passed: ${syscall} .. ✔"
-                pass=1; pass_once=1
+                echo "$success_mode .. ✔"
+                echo "$success_mode" >> ${text}
+                export pass_once=1
             fi
 
             if [ "$check_failure" != "" ] && [ "$fail_once" != 1 ]; then
-                echo "Failure mode passed: ${syscall} .. ✔"
-                fail=1; fail_once=1
+                echo "$failure_mode .. ✔"
+                echo "$failure_mode" >> ${text}
+                export fail_once=1
             fi
 
         done
 
-        # Check if both modes failed
-        if [ "$pass" = 0 ]; then
+        check_passed=$(cat test.txt | grep "${success_mode}")
+        check_failed=$(cat test.txt | grep "${failure_mode}")
+
+        if [ "$check_passed" = "" ]; then
             echo "Success mode failed: ${syscall} .. ✘"
         fi
 
-        if [ "$fail" = 0 ]; then
+        if [ "$check_failed" = "" ]; then
             echo "Failure mode failed: ${syscall} .. ✘"
         fi
 
@@ -114,6 +117,7 @@ cleanup()
 {
     echo 'Cleaning up test trails ..'
     rm -f "$auditdir/$1"
+    rm ${text}
     return
 }
 

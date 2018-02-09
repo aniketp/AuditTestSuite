@@ -15,10 +15,10 @@ enable_audit()
     return
 }
 
-# Set flags as network(nt) audit_class
+# Set flags as (all) audit_class
 set_flag()
 {
-    sed -i "" '/\<flags:/s/\(.*\)/flags:lo,nt/' "$audit_control"
+    sed -i "" '/\<flags:/s/\(.*\)/flags:all/' "$audit_control"
     echo "Set Associated flag: (nt) .. ✔"
     return
 }

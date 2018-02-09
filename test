@@ -2,11 +2,15 @@
 
 audit_control="/etc/security/audit_control"
 audit_daemon='/etc/rc.conf'
-text='test.txt'
+text='templogs'
+tcp_binary='tcp_socket'
+udp_server='udp_server'
+udp_client='udp_client'
 
 # Array containing all network system calls to be tested
 syscalls="socket(2) setsockopt(2) bind(2) listen(2)
-          accept(2) sendto(2) recvfrom(2) connect(2)"
+          accept(2) sendto(2) recvfrom(2) connect(2)
+          sendmsg(2) recvmsg(2)"
 
 
 # Fetches the location of Audit trails
@@ -41,19 +45,26 @@ stop_audit()
 # Execute the network binary and connect using telnet
 launch_syscalls()
 {
-    if [ ! -f network ]; then
+    if [ ! -f ${tcp_binary} ] && [ ! -f ${udp_server} ]  \
+    && [ ! -f ${udp_client} ]; then
         echo "Please run 'make' first .. ✘"
         stop_audit
         exit 1
     fi
 
     # Launch network system calls
-    ./network &
-    echo "Launching system calls .. ✔"
+    local tcp_socket="./${tcp_binary} &"
+    local udp_serv="./${udp_server} &"
+    local udp_cli="./${udp_client}"
 
-    # Connect to the socket
+    eval ${tcp_socket}
+
+    # Connect to the tcp socket
     telnet localhost 9000 | echo "Test Message"
-    echo "Connected via client .. ✔"
+
+    eval ${udp_serv}; eval ${udp_cli}
+
+    echo "Launching system calls .. ✔"
 
     return
 }
@@ -67,7 +78,7 @@ print_statistics()
     no_of_syscalls=$(echo ${syscalls} | wc -w)
     no_of_tests_expected=$(( 2 * ${no_of_syscalls} ))
 
-    printf "\n------------------Statistics---------------------\n"
+    printf "\n------------------Statistics-------------------\n"
     printf "Tests evaluated: ${no_of_tests_expected}\n"
     printf "Tests passed: ${no_of_tests_passed}\n"
     return
@@ -114,8 +125,8 @@ test_syscalls()
 
         done
 
-        check_passed=$(cat test.txt | grep "${success_mode}")
-        check_failed=$(cat test.txt | grep "${failure_mode}")
+        check_passed=$(cat ${text} | grep "${success_mode}")
+        check_failed=$(cat ${text} | grep "${failure_mode}")
 
         if [ "$check_passed" = "" ]; then
             echo "Success mode failed: ${syscall} .. ✘"

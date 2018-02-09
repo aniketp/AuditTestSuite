@@ -42,6 +42,11 @@ int main(int argc, char **argv) {
     msg.msg_iov = &io;
     msg.msg_iovlen = 1;
 
+
+    /* Failure Condition: sendmsg(2) */
+    recvmsg(ERROR, &msg, 0);
+
+    /* Success Condition: recvmsg(2) */
     if((length = recvmsg(sockfd, &msg, 0)) == ERROR){
         perror("Recvmsg Error");
         exit(ERROR);

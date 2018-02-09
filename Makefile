@@ -1,7 +1,7 @@
 CC=gcc
 
 all: clean
-	$(CC) -o tcp_socket network.c
+	$(CC) -o tcp_socket tcp_socket.c
 	$(CC) -o udp_server udp_server.c
 	$(CC) -o udp_client udp_client.c
 

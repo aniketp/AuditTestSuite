@@ -34,10 +34,14 @@ void main(int argc, char ** argv) {
     msg.msg_iov = &io;
     msg.msg_iovlen = 1;
 
+    /* Success Condition: sendmsg(2) */
     if((sendmsg(sockfd, &msg, MSG_OOB)) == ERROR){
         perror("Sendmsg error");
         exit(ERROR);
     }
+
+    /* Failure Condition: recvmsg(2) */
+    sendmsg(ERROR, &msg, MSG_OOB);
 
     close(sockfd);
 }

@@ -19,7 +19,7 @@ enable_audit()
 set_flag()
 {
     sed -i "" '/\<flags:/s/\(.*\)/flags:all/' "$audit_control"
-    echo "Set Associated flag: (nt) .. ✔"
+    echo "Set Attributed flag: (all) .. ✔"
     return
 }
 

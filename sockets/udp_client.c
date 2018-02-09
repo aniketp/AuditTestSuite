@@ -40,7 +40,7 @@ void main(int argc, char ** argv) {
         exit(ERROR);
     }
 
-    /* Failure Condition: recvmsg(2) */
+    /* Failure Condition: sendmsg(2) */
     sendmsg(ERROR, &msg, MSG_OOB);
 
     close(sockfd);

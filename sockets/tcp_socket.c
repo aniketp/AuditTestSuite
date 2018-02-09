@@ -79,7 +79,7 @@ void main(int argc, char **argv){
     accept(ERROR, (struct sockaddr *)&client, &len);
 
 
-    /* Success Condition: connect(2) established while recieving message buffer */
+    /* Success Condition: connect(2) established while receiving message buffer */
     /* Failure Condition: connect(2) */
     connect(ERROR, (struct sockaddr *)&server, len);
 

@@ -10,17 +10,19 @@ The test application would trigger all Syscalls one by one, evaluating that the 
 
 ## Directory Structure
 
-Source contains following significant files
-* **network.c** : Implementation of basic TCP socket which fires off a series of network syscalls. Each function is called twice, with the socket file descriptor being incorrect in one of the case, resulting in an expected error. Attempt is made to log both instances of each system call and then check whether the audit daemon logs them with the appropriate success and error message along with correct arguments.
+##### src/sockets
+* **tcp_socket.c** : Implementation of basic TCP socket which fires off a series of network syscalls. Each function is called twice, with the socket file descriptor being incorrect in one of the case, resulting in an expected error. Attempt is made to log both instances of each system call and then check whether the audit daemon logs them with the appropriate success and error message along with correct arguments.
 
-* **setup** : A script to setup the environment. i.e, start the audit daemon in case its not already running and setting up the correct flag, `flags:lo,nt` in the file `audit_control`.
+* **udp_socket.c** : Pair of source files to launch `recvmsg(2)` and `sendmsg(2)` functions for testing UDP socket audit.
 
-* **test** : A POSIX compliant shell script which does all the hard work. From firing off the network binary to extracting the data from resulting trail and analysing the result. Detailed functioning of the script is described later.
+* **test** : A POSIX compliant shell script which does all the hard work. From firing off the network binaries to extracting the data from active trail and analysing the audit logs. Detailed functioning of the script is described later.
 
-* **Makefile** : To compile and clean the resulting binaries
+##### src
+* **setup** : A script to setup the environment. i.e, start the audit daemon in case it is not already running and setting up the correct flag, `flags:all` in the file `audit_control`.
+
 
 ### Instructions
-Current set of tests include the basic network socket system calls.
+Current set of tests include the basic network system calls for both TCP and UDP sockets.
 
 Clone the repository,
 ```bash

@@ -49,10 +49,10 @@ launch_syscalls()
 
     # Launch network system calls
     ./network &
-    echo "launching system calls .. ✔"
+    echo "Launching system calls .. ✔"
 
     # Connect to the socket
-    telnet localhost 9000 | echo "message"
+    telnet localhost 9000 | echo "Test Message"
     echo "Connected via client .. ✔"
 
     return
@@ -62,7 +62,8 @@ launch_syscalls()
 # Prints the result of testing
 print_statistics()
 {
-    no_of_tests_passed=$(wc -l ${text})
+
+    no_of_tests_passed=$(wc -l ${text} | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 1)
     no_of_syscalls=$(echo ${syscalls} | wc -w)
     no_of_tests_expected=$(( 2 * ${no_of_syscalls} ))
 

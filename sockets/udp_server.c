@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     msg.msg_iovlen = 1;
 
 
-    /* Failure Condition: sendmsg(2) */
+    /* Failure Condition: recvmsg(2) */
     recvmsg(ERROR, &msg, 0);
 
     /* Success Condition: recvmsg(2) */

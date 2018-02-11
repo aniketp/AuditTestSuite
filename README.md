@@ -31,13 +31,14 @@ Clone the repository,
 
 Setup the necessary values in configuration files
 ```bash
+ $ cd audit
  $ ./setup
 ```
 
 And execute the testing script.
 ```bash
- $ make
- $ ./test
+ $ cd sockets
+ $ make && ./test
 ```
 
 ### Testing Status

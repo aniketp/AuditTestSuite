@@ -58,3 +58,6 @@ Current scenario: All the 10 included tests are passing in both *Success* and *F
 9       |connect(2)     |:white_check_mark:
 10      |sendmsg(2)     |:white_check_mark:
 11      |recvmsg(2)     |:white_check_mark:
+
+### TODO
+Check if the audit daemon is already running. If so, stop it first.

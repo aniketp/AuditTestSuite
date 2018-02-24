@@ -2,20 +2,41 @@
 
 audit_control="/etc/security/audit_control"
 text='templogs'
-tcp_binary='tcp_socket'
-udp_server='udp_server'
-udp_client='udp_client'
+touch ${text}
+open_binary='open'
+read_binary='readlink'
+
+templog='/tmp/templog'
+symlink='/tmp/templog1'
+temp='/tmp/ERROR'
 
 # Array containing all network system calls to be tested
-syscalls="socket(2) setsockopt(2) bind(2) listen(2)
-          accept(2) sendto(2) recvfrom(2) connect(2)
-          sendmsg(2) recvmsg(2)"
+syscalls="open(2) openat(2) readlink(2) readlinkat(2)"
 
 
 # Fetches the location of Audit trails
 # Default: /var/audit
 auditdir=$(cat ${audit_control} | grep "dir:" | cut -d ':' -f 2)
 echo "Audit Directory: ${auditdir} .. ✔"
+
+
+# Create files to be tested with open and readlink
+setup_env()
+{
+
+    # Unlink ERROR in current directory
+    if [ -f ${temp} ]; then
+        rm ${temp}
+    fi
+
+    # Create a file and its symbolic link in /tmp
+    touch ${templog}
+
+    if [ ! -L ${symlink} ]; then
+        ln -s ${templog} ${symlink}
+    fi
+    return
+}
 
 
 # Start audit daemon and catch the generated trails
@@ -44,24 +65,17 @@ stop_audit()
 # Execute the network binary and connect using telnet
 launch_syscalls()
 {
-    if [ ! -f ${tcp_binary} ] && [ ! -f ${udp_server} ]  \
-    && [ ! -f ${udp_client} ]; then
+    if [ ! -f ${open_binary} ] && [ ! -f ${read_binary} ]; then
         echo "Please run 'make' first .. ✘"
         stop_audit
         exit 1
     fi
 
     # Launch network system calls
-    local tcp_socket="./${tcp_binary} &"
-    local udp_serv="./${udp_server} &"
-    local udp_cli="./${udp_client}"
+    local open="./${open_binary}"
+    local readlink="./${read_binary}"
 
-    eval ${tcp_socket}
-
-    # Connect to the tcp socket
-    telnet localhost 9000 | echo "Test Message"
-
-    eval ${udp_serv}; eval ${udp_cli}
+    eval ${open}; eval ${readlink}
 
     echo "Launching system calls .. ✔"
 
@@ -105,8 +119,8 @@ test_syscalls()
 
         praudit -l ${fullpath} | grep ${syscall} | while read -r find_syscall; do
             # Check for success and failure mode
-            check_success=$(echo ${find_syscall} | grep "return,success")
-            check_failure=$(echo ${find_syscall} | grep "return,failure")
+            check_success=$(echo ${find_syscall} | grep -E "templog.*return,success")
+            check_failure=$(echo ${find_syscall} | grep -E "ERROR.*return,failure")
 
             # Can add tests for arguments, file descriptors etc
 
@@ -156,6 +170,7 @@ cleanup()
 main()
 {
 
+    setup_env
     start_audit
     launch_syscalls
 

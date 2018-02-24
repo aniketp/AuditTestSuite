@@ -2,16 +2,27 @@
 #include<unistd.h>
 #include<stdlib.h>
 #include<fcntl.h>
+#include<sys/syscall.h>
 
 #define BUFFLEN 1024
 #define ERROR (-1)
 
 void main(){
-    int filedesc;
+    long int filedesc1, filedesc2;
+
+    /* Success Condition: open(2) */
+    if ((filedesc1 = syscall(SYS_open, "test", O_RDWR)) == ERROR){
+        perror("open");
+        exit(ERROR);
+    }
+
+    /* Failure Condition: open(2) */
+    syscall(SYS_open, "ERROR", O_RDWR);
+
 
     /* Success condition: openat(2) */
     /* Currently tests for read-write (no-create) flag */
-    if ((filedesc = openat(AT_FDCWD ,"test", O_RDWR)) == ERROR){
+    if ((filedesc2 = openat(AT_FDCWD ,"test", O_RDWR)) == ERROR){
         perror("open");
         exit(ERROR);
     }
@@ -19,6 +30,8 @@ void main(){
     /* Failure Condition: openat(2) */
     openat(AT_FDCWD ,"ERROR", O_RDWR);
 
-    close(filedesc);
+
+    close((int) filedesc1);
+    close((int) filedesc2);
 
 }

@@ -7,22 +7,31 @@ The test application would trigger all Syscalls one by one, evaluating that the 
 
 ## Workplan Report
 * [Report1: Network System Call testing](https://gist.github.com/aniketp/4311599ab72efe73d8a3d3e1c93f3759)
+* [Report2: File-read System Call testing](https://gist.github.com/aniketp/ada457f284c362da5b4ecae8929a807e)
 
 ## Directory Structure
 
-##### src/sockets
-* **tcp_socket.c** : Implementation of basic TCP socket which fires off a series of network syscalls. Each function is called twice, with the socket file descriptor being incorrect in one of the case, resulting in an expected error. Attempt is made to log both instances of each system call and then check whether the audit daemon logs them with the appropriate success and error message along with correct arguments.
-
-* **udp_socket.c** : Pair of source files to launch `recvmsg(2)` and `sendmsg(2)` functions for testing UDP socket audit.
-
-* **test** : A POSIX compliant shell script which does all the hard work. From firing off the network binaries to extracting the data from active trail and analysing the audit logs. Detailed functioning of the script is described later.
+```
+ ├── filesystem ------------ Source files and automation tool for testing file-read (fr) syscalls
+ │   ├── open.c
+ │   ├── readlink.c
+ │   └── test
+ ├── sockets --------------- Source files and automation tool for testing network-socket (nt) syscalls
+ │   ├── tcp_socket.c
+ │   ├── udp_server.c
+ │   ├── udp_client.c
+ │   └── test
+ ├── setup ----------------- Script to setup the testing environment (Used Once)
+ └── scripts
+     └── ------------------- Helper scripts for collecting stuff from audit trails
+```
 
 ##### src
 * **setup** : A script to setup the environment. i.e, start the audit daemon in case it is not already running and setting up the correct flag, `flags:all` in the file `audit_control`.
 
 
 ### Instructions
-Current set of tests include the basic network system calls for both TCP and UDP sockets.
+Current set of tests include the basic network system calls for both TCP & UDP sockets and tests for filesystem syscalls (in read mode).
 
 Clone the repository,
 ```bash
@@ -37,27 +46,13 @@ Setup the necessary values in configuration files
 
 And execute the testing script.
 ```bash
- $ cd sockets
+ $ cd sockets (or cd filesystem)
  $ make && ./test
 ```
 
 ### Testing Status
 
-Current scenario: All the 10 included tests are passing in both *Success* and *Failure* modes.
-
-|  Num  |	Syscall	 |  Status
-|:-----:|:---------:|:-----------------:
-1       |socket(2)	 	|:white_check_mark:
-2       |bind(2)		|:white_check_mark:
-3       |setsockopt(2)  |:white_check_mark:
-4       |listen(2)      |:white_check_mark:
-5       |accept(2)		|:white_check_mark:
-6       |sendto(2)		|:white_check_mark:
-7       |recvfrom(2)	|:white_check_mark:
-8       |shutdown(2)	| (TBD)
-9       |connect(2)     |:white_check_mark:
-10      |sendmsg(2)     |:white_check_mark:
-11      |recvmsg(2)     |:white_check_mark:
+Current scenario: All the 14 included tests are passing in both *Success* and *Failure* modes.
 
 ### TODO
 Check if the audit daemon is already running. If so, stop it first.

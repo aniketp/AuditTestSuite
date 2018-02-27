@@ -8,6 +8,8 @@
 
 void main(){
     char buff1[BUFFLEN], buff2[BUFFLEN];
+    char *sym = "/tmp/templog1";
+    char *err = "/tmp/ERROR";
     int fd = 0;
 
     /* readlink(2), readlinkat(2) do not append '\0' at the end */
@@ -15,21 +17,21 @@ void main(){
     memset(buff2, 0, sizeof(buff2));
 
     /* Success condition: readlink(2) */
-    if (readlink("templog1", buff1, sizeof(buff1)-1) == ERROR){
+    if (readlink(sym, buff1, sizeof(buff1)-1) == ERROR){
         perror("readlink");
         exit(ERROR);
     }
 
     /* Failure condition: readlink(2) */
-    readlink("/tmp/ERROR", buff1, sizeof(buff1)-1);
+    readlink(err, buff1, sizeof(buff1)-1);
 
     /* Success condition: readlinkat(2) */
-    if (readlinkat(fd, "templog1", buff2, sizeof(buff2)-1) == ERROR){
+    if (readlinkat(fd, sym, buff2, sizeof(buff2)-1) == ERROR){
         perror("readlinkat");
         exit(ERROR);
     }
 
     /* Failure condition: readlinkat(2) */
-    readlinkat(fd, "/tmp/ERROR", buff2, sizeof(buff2)-1);
+    readlinkat(fd, err, buff2, sizeof(buff2)-1);
 
 }

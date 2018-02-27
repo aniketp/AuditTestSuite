@@ -20,7 +20,7 @@ void main(int argc, char **argv){
     char msg[] = "Message Sent\n";
     int tr=1;
 
-    // Assigning addresses
+    /* Assigning addresses */
     server.sin_family = PF_INET;            // IPv4
     server.sin_port = htons(9000);          // Port in network bytes
     server.sin_addr.s_addr = INADDR_ANY;    // All available interfaces
@@ -40,7 +40,7 @@ void main(int argc, char **argv){
 
 
     /* Success Condition: setsockopt(2) */
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, sizeof(int)) == ERROR) {
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, sizeof(int)) == ERROR){
         perror("setsockopt");
         exit(ERROR);
     }
@@ -103,9 +103,5 @@ void main(int argc, char **argv){
         exit(ERROR);
     };
 
-
-    /* TODO: Implement sendto(2), recvfrom(2), connect(2) here */
-
-    // Close the connection
     close(clientfd);
 }

@@ -55,14 +55,14 @@ start_audit()
 # Stop Audit daemon
 stop_audit()
 {
-    local stop="audit -t &> /dev/null"
+    local stop="audit -t"
     eval ${stop}
     echo "Audit daemon stopped .. ✔"
     return
 }
 
 
-# Execute the network binary and connect using telnet
+# Launch the system calls
 launch_syscalls()
 {
     if [ ! -f ${open_binary} ] && [ ! -f ${read_binary} ]; then
@@ -71,14 +71,11 @@ launch_syscalls()
         exit 1
     fi
 
-    # Launch network system calls
     local open="./${open_binary}"
     local readlink="./${read_binary}"
 
     eval ${open}; eval ${readlink}
-
     echo "Launching system calls .. ✔"
-
     return
 }
 
@@ -86,7 +83,6 @@ launch_syscalls()
 # Prints the result of testing
 print_statistics()
 {
-
     no_of_tests_passed=$(wc -l ${text} | sed -e 's/^[[:space:]]*//' | cut -d ' ' -f 1)
     no_of_syscalls=$(echo ${syscalls} | wc -w)
     no_of_tests_expected=$(( 2 * ${no_of_syscalls} ))
@@ -103,14 +99,11 @@ print_statistics()
 # for that particular mode passes.
 test_syscalls()
 {
-
     local main_trail=$1
-
     local fullpath="${auditdir}/${main_trail}"
 
     # Loop through the lines of $fullpath and check success
     # and failure condition of each syscall
-
     for syscall in ${syscalls}; do
         printf "===============================================\n"
         echo "Testing ${syscall}.."
@@ -135,7 +128,6 @@ test_syscalls()
                 echo "$failure_mode" >> ${text}
                 export fail_once=1
             fi
-
         done
 
         check_passed=$(cat ${text} | grep "${success_mode}")
@@ -159,7 +151,6 @@ test_syscalls()
 # Cleans up the trails and the log files
 cleanup()
 {
-
     rm -f "$auditdir/$1"
     rm ${text}
     return
@@ -169,7 +160,6 @@ cleanup()
 # Main function to launch all the functions above
 main()
 {
-
     setup_env
     start_audit
     launch_syscalls
@@ -182,7 +172,6 @@ main()
     local main_trail=$(ls ${auditdir} | grep ${init_name})
     test_syscalls ${main_trail}
     cleanup ${main_trail}
-
     return
 }
 

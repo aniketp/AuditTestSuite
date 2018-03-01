@@ -55,4 +55,5 @@ And execute the testing script.
 Current scenario: All the 14 included tests are passing in both *Success* and *Failure* modes.
 
 ### TODO
-Check if the audit daemon is already running. If so, stop it first.
+* Check if the audit daemon is already running. If so, stop it first.
+* Cleanup in mkdir, symlink etc tests.

@@ -10,7 +10,7 @@
 void main(){
     int filedesc1, filedesc2;
     int filedesc = 0;
-    char *fifo1 = "/tmp/fifo1", *fifo2 = "/tmp/fifo2"
+    char *fifo1 = "/tmp/fifo1", *fifo2 = "/tmp/fifo2";
     dev_t dev = 0;
 
     /* Success Condition: mknod(2) */

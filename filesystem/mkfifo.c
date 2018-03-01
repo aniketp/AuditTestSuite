@@ -8,7 +8,7 @@
 void main(){
     int filedesc1, filedesc2;
     int filedesc = 0;
-    char *dir1 = "/tmp/temp1", *dir2 = "/tmp/temp2"
+    char *dir1 = "/tmp/temp1", *dir2 = "/tmp/temp2";
     mode_t mode = 0777;
 
     /* Success Condition: mkfifo(2) */

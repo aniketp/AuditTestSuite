@@ -52,7 +52,7 @@ And execute the testing script.
 
 ### Testing Status
 
-Current scenario: All the 14 included tests are passing in both *Success* and *Failure* modes.
+Current scenario: All the 48 included tests are passing in both *Success* and *Failure* modes.
 
 ### TODO
 * Check if the audit daemon is already running. If so, stop it first.

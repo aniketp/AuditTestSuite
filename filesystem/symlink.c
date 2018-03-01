@@ -7,8 +7,8 @@
 void main(){
     int filedesc1, filedesc2;
     int filedesc = 0;
-    char *file1 = "/tmp/temp1", *file2 = "/tmp/temp2"
-    char *sym1 = "/tmp/sym1", *sym2 = "/tmp/sym2"
+    char *file1 = "/tmp/temp1", *file2 = "/tmp/temp2";
+    char *sym1 = "/tmp/sym1", *sym2 = "/tmp/sym2";
 
     /* Success Condition: symlink(2) */
     if ((filedesc1 = symlink(file1, sym1)) == ERROR){

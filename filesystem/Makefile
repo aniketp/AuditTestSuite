@@ -6,5 +6,8 @@ all: clean
 
 .PHONY: clean
 
+run:
+	./run_tests
+
 clean:
 	rm -f readlink open

@@ -2,6 +2,7 @@
 
 #include<stdio.h>
 #include<stdlib.h>
+#include<unistd.h>
 #include<sys/stat.h>
 #include<sys/types.h>
 
@@ -31,4 +32,12 @@ void main(){
 
     /* Failure condition: mknodat(2) :: fifo already exists */
     mknodat(filedesc, fifo2, S_IFIFO | S_IRWXO, dev);
+
+    /* Node cleanup */
+    int fifo1_ = unlink(fifo1);
+    int fifo2_ = unlink(fifo2);
+    if ((fifo1_ == ERROR) || (fifo2_ == ERROR)){
+        perror("unlink");
+        exit(ERROR);
+    }
 }

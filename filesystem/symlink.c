@@ -15,6 +15,7 @@ void main(){
         perror("symlink");
         exit(ERROR);
     }
+
     /* Failure condition: symlink(2) :: File already exists */
     symlink(file1, sym1);
 
@@ -27,4 +28,12 @@ void main(){
 
     /* Failure condition: symlinkat(2) :: File already exists */
     symlinkat(file2, filedesc, sym2);
+
+    /* Symlink cleanup */
+    int sym1_ = unlink(sym1);
+    int sym2_ = unlink(sym2);
+    if ((sym1_ == ERROR) || (sym2_ == ERROR)){
+        perror("unlink");
+        exit(ERROR);
+    }
 }

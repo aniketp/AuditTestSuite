@@ -27,4 +27,4 @@ Current scenario: All the 14 included tests for File Read (fr) event class are p
 
 * **open.c** : Source for triggering `open(2)` and `openat(2)`. Note: `syscall(2)` is used for calling open as libc converts 'open(2)' to 'openat(2)'.
 
-* **test** : A POSIX compliant shell script which does all the hard work. From firing off the binaries to extracting the data from active trail and analysing the audit logs. Detailed functioning of the script is described later.
+* **run\_tests** : A POSIX compliant shell script which does all the hard work. From firing off the binaries to extracting the data from active trail and analysing the audit logs. Detailed functioning of the script is described later.

@@ -25,4 +25,4 @@ Current scenario: All the 10 included tests for TCP and UDP sockets are passing 
 
 * **udp_socket.c** : Pair of source files to launch `recvmsg(2)` and `sendmsg(2)` functions for testing UDP socket audit.
 
-* **test** : A POSIX compliant shell script which does all the hard work. From firing off the network binaries to extracting the data from active trail and analysing the audit logs. Detailed functioning of the script is described later.
+* **run\_tests** : A POSIX compliant shell script which does all the hard work. From firing off the network binaries to extracting the data from active trail and analysing the audit logs. Detailed functioning of the script is described later.

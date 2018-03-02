@@ -152,7 +152,7 @@ test_syscalls()
 cleanup()
 {
     rm -f "$auditdir/$1"
-    rm ${text}
+    rm ${text} ${templog} ${symlink}
     return
 }
 

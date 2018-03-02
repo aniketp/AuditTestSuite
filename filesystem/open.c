@@ -32,7 +32,6 @@ void main(){
     /* Failure Condition: openat(2) */
     openat(AT_FDCWD, err, O_RDWR);
 
-
     close((int) filedesc1);
     close((int) filedesc2);
 

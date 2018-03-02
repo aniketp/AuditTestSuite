@@ -15,12 +15,12 @@ The test application would trigger all Syscalls one by one, evaluating that the 
  ├── filesystem ------------ Source files and automation tool for testing file-read (fr) syscalls
  │   ├── open.c
  │   ├── readlink.c
- │   └── test
+ │   └── run_tests --------- [Automation Script]
  ├── sockets --------------- Source files and automation tool for testing network-socket (nt) syscalls
  │   ├── tcp_socket.c
  │   ├── udp_server.c
  │   ├── udp_client.c
- │   └── test
+ │   └── run_tests --------- [Automation Script]
  ├── setup ----------------- Script to setup the testing environment (Used Once)
  └── scripts
      └── ------------------- Helper scripts for collecting stuff from audit trails
@@ -47,7 +47,7 @@ Setup the necessary values in configuration files
 And execute the testing script.
 ```bash
  $ cd sockets (or cd filesystem)
- $ make && ./test
+ $ make && make run
 ```
 
 ### Testing Status
@@ -56,4 +56,3 @@ Current scenario: All the 48 included tests are passing in both *Success* and *F
 
 ### TODO
 * Check if the audit daemon is already running. If so, stop it first.
-* Cleanup in mkdir, symlink etc tests.

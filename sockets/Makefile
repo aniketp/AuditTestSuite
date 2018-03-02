@@ -7,5 +7,8 @@ all: clean
 
 .PHONY: clean
 
+run:
+	./run_tests
+
 clean:
 	rm -f tcp_socket tcp_socket.core udp_server udp_client

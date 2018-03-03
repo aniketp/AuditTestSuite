@@ -14,7 +14,11 @@ The test application would trigger all Syscalls one by one, evaluating that the 
 ```
  ├── filesystem ------------ Source files and automation tool for testing file-read (fr) syscalls
  │   ├── open.c
- │   ├── readlink.c
+ │   ├── link.c
+ │   ├── symlink.c
+ │   ├── mkfifo.c
+ │   ├── mkdir.c
+ │   ├── mknod.c
  │   └── run_tests --------- [Automation Script]
  ├── sockets --------------- Source files and automation tool for testing network-socket (nt) syscalls
  │   ├── tcp_socket.c

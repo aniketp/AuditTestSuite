@@ -3,14 +3,15 @@
 # Script to setup the testing environment
 
 audit_control="/etc/security/audit_control"
-audit_daemon='/etc/rc.conf'
+#audit_daemon='/etc/rc.conf'
 
 # Inserts auditd_enable="YES" in /etc/rc.conf
 # if not already done
 enable_audit()
 {
-    sed -i "" '/auditd_enable/d' "$audit_daemon"
-    echo "auditd_enable=\"YES\"" >> "$audit_daemon"
+    sysrc auditd_enable=YES
+    # sed -i "" '/auditd_enable/d' "$audit_daemon"
+    # echo "auditd_enable=\"YES\"" >> "$audit_daemon"
     echo "Audit daemon configured .. ✔"
     return
 }

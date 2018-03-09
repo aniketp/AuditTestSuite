@@ -6,6 +6,7 @@
 #include<sys/stat.h>
 
 #include<atf-c.h>
+#include<dirent.h>
 
 #define BUFFLEN 512
 #define ERROR (-1)
@@ -65,16 +66,16 @@ ATF_TC_BODY(mkdir_failure, tc)
     char *syscall = "mkdir";
 
     setup();
-    ATF_REQUIRE(mkdir(dir1, mode) != ERROR);
+    mkdir(dir1, mode);
     get_trail(syscall);
-    ATF_REQUIRE(atf_utils_grep_file(syscall, filedesc));
+    ATF_REQUIRE(atf_utils_grep_file("%s", filedesc, syscall));
 
 }
 
 ATF_TC_CLEANUP(mkdir_failure, tc)
 {
-    system("service auditd onestop");
     unlink(filedesc);
+    system("service auditd onestop");
 }
 
 ATF_TP_ADD_TCS(tp)

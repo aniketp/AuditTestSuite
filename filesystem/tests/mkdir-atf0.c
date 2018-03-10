@@ -1,54 +1,61 @@
-#define _BSD_SOURCE
 #include<stdio.h>
 #include<string.h>
 #include<stdlib.h>
 #include<unistd.h>
-#include<sys/stat.h>
-
+#include<fcntl.h>
+#include<poll.h>
 #include<atf-c.h>
-#include<dirent.h>
 
 #define BUFFLEN 512
 #define ERROR (-1)
 
-char *filedesc = "/tmp/tmplog.txt";
-char *dir1 = "/tmp/dir1";
+char *filedesc = "grepfile.txt";
+char *filepath = "fileforaudit";
 mode_t mode = 0777;
 
 static void
 setup(void) {
     ATF_REQUIRE_EQ(0, system("{ service auditd onestatus || \
-    { service auditd onestart && touch started_auditd ; } ; } && audit -n"));
+    { service auditd onestart && touch started_auditd ; } ; } && audit -n \
+    > /dev/null 2>&1 "));
 }
 
 static void
-get_trail(char* syscall) {
-    char buff1[BUFFLEN], buff2[BUFFLEN];
-    char trail[BUFFLEN];
+get_trail(char* path) {
+    char buff[BUFFLEN];
+    struct pollfd fds[1];
+    int timeout = 5000;
 
-    FILE *fp = popen("ls /var/audit", "r");
-    while(fgets(buff1, BUFFLEN, fp) != 0){
-        if(strstr(buff1, ".not_terminated") != 0) {
-            strtok(buff1, "\n");
-            snprintf(trail, sizeof(trail), "%s | grep %s\n", buff1, syscall);
-            break;
+    fds[0].fd = open(filedesc, O_RDWR);
+    fds[0].events = POLLIN;
+
+    FILE *fp1 = fopen(filedesc, "w");
+    FILE *praudit = popen("praudit -l /dev/auditpipe", "r");
+
+    if (poll(fds, 1, timeout) < 0) {
+        perror("poll");
+        exit(ERROR);
+    } else {
+        while(fgets(buff, BUFFLEN, praudit) != 0){
+            if(strstr(buff, path) != 0) {
+                // Writing to the grepfile.txt if file path found
+                fprintf(fp1, "%s", buff);
+
+                // If the write was successful, this condition must be true
+                if (fds[0].revents & POLLIN) {
+                    break;  // Success
+                }
+                if (fds[0].revents & POLLHUP) {
+                    printf("Hangup\n"); break;
+                }
+            }
         }
-        //fprintf(fp2, "%s", buff)
     }
 
-    pclose(fp);
+    close(fds[0].fd);
+    pclose(praudit);
+    fclose(fp1);
 
-    char command[50]; strcpy(command, "praudit -l /var/audit/");
-    strcat(command, trail);
-    FILE *fp3 = fopen(filedesc, "w");
-
-    FILE *fp2 = popen(command, "r");
-    while(fgets(buff2, BUFFLEN, fp2)){
-        fprintf(fp3, "%s", buff2);
-    }
-
-    pclose(fp2);
-    fclose(fp3);
 
 }
 
@@ -63,18 +70,17 @@ ATF_TC_HEAD(mkdir_failure, tc)
 
 ATF_TC_BODY(mkdir_failure, tc)
 {
-    char *syscall = "mkdir";
 
     setup();
-    mkdir(dir1, mode);
-    get_trail(syscall);
-    ATF_REQUIRE(atf_utils_grep_file("%s", filedesc, syscall));
+    sleep(1);
+    mkdir(filepath, mode);
+    get_trail(filepath);
+    ATF_REQUIRE(atf_utils_grep_file("%s", filedesc, filepath));
 
 }
 
 ATF_TC_CLEANUP(mkdir_failure, tc)
 {
-    unlink(filedesc);
     system("service auditd onestop");
 }
 

@@ -9,11 +9,11 @@
 #include<atf-c.h>
 
 #define ERROR (-1)
+int exitcode;
 
 static void
-setup(void) {
-    ATF_REQUIRE_EQ(0, system("{ service auditd onestatus || \
-    { service auditd onestart && touch started_auditd ; } ; } && audit -n \
+setup() {
+    ATF_REQUIRE_EQ(0, system("service auditd onestart && touch started_auditd \
     > /dev/null 2>&1 "));
 }
 
@@ -37,51 +37,58 @@ ATF_TC_BODY(mkdir_success, tc)
 
     /* Convert binary trail to human readable form (Temporary fix) */
     snprintf(cmd, sizeof(cmd), "praudit -l %s > %s", file1, file2);
+    exitcode = system("service auditd onestatus > /dev/null 2>&1");
 
     fds[0].fd = open("/dev/auditpipe", O_RDONLY);
     fds[0].events = POLLIN;
-    setup();
-
-    if (poll(fds, 1, timeout) < 0) {
-        atf_tc_fail("Poll: %s", strerror(errno));
-    } else {
-        if (fds[0].revents & POLLIN) {
-            ATF_REQUIRE((ret = read(fds[0].fd, buff2, sizeof(buff2))) != ERROR);
-            /* Store the buffer in a file */
-            FILE *fd = fopen(file1, "w");
-            fwrite(buff2, 1, ret, fd);
-            fclose(fd);
-
-            /* We now have a proof that auditd(8) started smoothly */
-            ATF_REQUIRE(system(cmd) != ERRO
-        } else {
-            /* revents is not POLLIN */
-            atf_tc_fail("auditpipe returned an unknown event %#x", fds[0].revents);
-        }
-    }
 
     /* Check if the audit startup was properly logged */
-    if(atf_utils_grep_file("audit startup", file2)){
-        /* Success condition: mkdir(2) */
-        ATF_REQUIRE_EQ(0, mkdir(path, mode));
+    /* If exitcode is non-zero, it means we started the auditd */
+    if (exitcode()) {
+        setup();
 
         if (poll(fds, 1, timeout) < 0) {
             atf_tc_fail("Poll: %s", strerror(errno));
         } else {
             if (fds[0].revents & POLLIN) {
-                ATF_REQUIRE((ret = read(fds[0].fd, buff, sizeof(buff))) != ERROR);
-                /*
-                 * Overwrite the previous logfile with the buffer containing
-                 * mkdir(2) tokens along with some other utility system calls
-                 */
+                ATF_REQUIRE((ret = read(fds[0].fd, buff2, \
+                     sizeof(buff2))) != ERROR);
+                /* Store the buffer in a file */
                 FILE *fd = fopen(file1, "w");
-                fwrite(buff, 1, ret, fd);
+                fwrite(buff2, 1, ret, fd);
                 fclose(fd);
+
+                /* We now have a proof that auditd(8) started smoothly */
+                ATF_REQUIRE(system(cmd) != ERROR);
             } else {
                 /* revents is not POLLIN */
-                atf_tc_fail("auditpipe returned an unknown event %#x", \
+                atf_tc_fail("auditpipe returned an unknown event %#x",\
                  fds[0].revents);
             }
+        }
+
+        ATF_REQUIRE(atf_utils_grep_file("audit startup", file2));
+    }
+
+    /* Success condition: mkdir(2) */
+    ATF_REQUIRE_EQ(0, mkdir(path, mode));
+
+    if (poll(fds, 1, timeout) < 0) {
+        atf_tc_fail("Poll: %s", strerror(errno));
+    } else {
+        if (fds[0].revents & POLLIN) {
+            ATF_REQUIRE((ret = read(fds[0].fd, buff, sizeof(buff))) != ERROR);
+            /*
+             * Overwrite the previous logfile with the buffer containing
+             * mkdir(2) tokens along with some other utility system calls
+             */
+            FILE *fd = fopen(file1, "w");
+            fwrite(buff, 1, ret, fd);
+            fclose(fd);
+        } else {
+            /* revents is not POLLIN */
+            atf_tc_fail("auditpipe returned an unknown event %#x", \
+             fds[0].revents);
         }
     }
 

@@ -12,6 +12,7 @@
 
 #include<atf-c.h>
 #include<bsm/audit.h>
+#include<bsm/libbsm.h>
 #include<security/audit/audit_ioctl.h>
 
 #define ERROR (-1)
@@ -34,8 +35,9 @@ ATF_TC_HEAD(mkdir_success, tc)
 
 ATF_TC_BODY(mkdir_success, tc)
 {
-    char buff[512], cmd[64], buff2[512];
     struct pollfd fds[1];
+    struct timespec endptr, curptr;
+    char buff[512], cmd[64], buff2[512];
     int timeout = 2000, ret = 0;
     char *file1 = "temp1", *file2 = "temp2";
     char *path = "fileforaudit";
@@ -44,8 +46,11 @@ ATF_TC_BODY(mkdir_success, tc)
     /* Define arguments to configure local audit ioctls */
     int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
     au_mask_t fmask;
-    fmask.am_success = 0x00000010;
-    fmask.am_failure = 0x00000010;
+    au_class_ent_t *class;
+
+    ATF_REQUIRE((class = getauclassnam("fc")) != NULL);
+    fmask.am_success = class->ac_class;
+    fmask.am_failure = class->ac_class;
 
     /* Convert binary trail to human readable form (Temporary fix) */
     snprintf(cmd, sizeof(cmd), "praudit -l %s > %s", file1, file2);
@@ -103,21 +108,25 @@ ATF_TC_BODY(mkdir_success, tc)
         atf_tc_fail("Auditpipe flush: %s", strerror(errno));
     }
 
+    /* Set the expire time for poll(2) while waiting for mkdir(2) */
+    ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endptr));
+    endptr.tv_sec += 5;
 
     /* Success condition: mkdir(2) */
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
-
-    time_t end;
-    end = time(NULL) + 5;
 
     /*
      * Loop until the auditpipe returns something, check if it is what
      * we want else repeat the procedure until poll(2) times out.
      */
     while(true){
-        switch(poll(fds, 1, (end - time(NULL))*1000)){
-            /* poll(2) returns an event, check if it's the event we want */
-            case 1: {
+        /* Update the current time left for auditpipe to return any event */
+        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &curptr));
+        curptr.tv_sec = endptr.tv_sec - curptr.tv_sec;
+
+        switch(ppoll(fds, 1, &curptr, NULL)){
+            /* ppoll(2) returns an event, check if it's the event we want */
+            case 1:
                 if (fds[0].revents & POLLIN) {
                     ATF_REQUIRE((ret = read(fds[0].fd, buff, \
                         sizeof(buff))) != ERROR);
@@ -133,8 +142,7 @@ ATF_TC_BODY(mkdir_success, tc)
                 } else {
                     atf_tc_fail("Auditpipe returned an unknown event"
                                 "%#x", fds[0].revents);
-                }
-            } break;
+                } break;
 
             /* poll(2) timed out */
             case 0:
@@ -145,7 +153,7 @@ ATF_TC_BODY(mkdir_success, tc)
                 atf_tc_fail("Poll: %s", strerror(errno)); break;
 
             default:
-                atf_tc_fail("Poll returned an unknown value");
+                atf_tc_fail("Poll returned an unknown event");
         }
     }
 

@@ -16,6 +16,7 @@
 #include<security/audit/audit_ioctl.h>
 
 #define ERROR (-1)
+#define BUFFLEN 1024
 
 static void
 setup(void)
@@ -24,39 +25,41 @@ setup(void)
      { service auditd onestart && touch started_auditd ; }"));
 }
 
-static void
-getrecords(char *file1, char *file2)
+static bool
+getrecords(char *path, FILE *pipestream)
 {
     u_char *buff;
-    char *del = ",";
     tokenstr_t token;
-    int reclen, bytesread;
+    ssize_t size = BUFFLEN;
+    char *del = ",", membuff[size];
+    int reclen, bytesread = 0;
 
-    FILE *fp1 = fopen(file1, "r");
-    FILE *fp2 = fopen(file2, "w");
+    /*
+     * Open a stream on 'membuff' (address to memory buffer) for storing
+     * the audit records in the default mode.'reclen' is the length of the
+     * available records from auditpipe and the let's the functions
+     * au_fetch_tok(3) and au_print_flags_tok(3) do their respective jobs.
+     */
+    FILE *memstream = fmemopen(membuff, size, "w");
+    ATF_REQUIRE(reclen = au_read_rec(pipestream, &buff) != ERROR);
 
-    /* Process the obtained BSM record, one token at a time */
-    while ((reclen = au_read_rec(fp1, &buff)) != ERROR) {
-        bytesread = 0;
+    /*
+     * Iterate through each BSM token, extracting the bits that are
+     * required to starting processing sequences.
+     */
+    while (bytesread < reclen) {
+        if (au_fetch_tok(&token, buff + bytesread, \
+             reclen - bytesread) == ERROR) {
+            atf_tc_fail("Incomplete audit record");
+        };
 
-        /*
-        * Iterate through each BSM token, extracting the bits that are
-        * required to starting processing sequences.
-        */
-        while (bytesread < reclen) {
-            if (au_fetch_tok(&token, buff + bytesread, \
-                 reclen - bytesread) == ERROR) {
-                atf_tc_fail("Audit record incomplete");
-            };
-
-            /* Print the tokens as they are obtained, in their default form */
-            au_print_flags_tok(fp2, &token, del, AU_OFLAG_NONE);
-            bytesread += token.len;
-        }
+    /* Print the tokens as they are obtained, in their default form */
+        au_print_flags_tok(memstream, &token, del, AU_OFLAG_NONE);
+        bytesread += token.len;
     }
 
-    free(buff);
-    fclose(fp1); fclose(fp2);
+    free(buff); fclose(memstream);
+    return atf_utils_grep_string("%s", membuff, path);
 }
 
 
@@ -66,7 +69,7 @@ getrecords(char *file1, char *file2)
 ATF_TC_WITH_CLEANUP(mkdir_success);
 ATF_TC_HEAD(mkdir_success, tc)
 {
-    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of"
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
                                     "mkdir(2)");
 }
 
@@ -74,11 +77,13 @@ ATF_TC_BODY(mkdir_success, tc)
 {
     struct pollfd fds[1];
     struct timespec endptr, curptr;
-    char buff[512], cmd[64], buff2[512];
-    int timeout = 2000, ret = 0;
-    char *file1 = "temp1", *file2 = "temp2";
-    char *path = "fileforaudit";
     mode_t mode = 0777;
+    ssize_t size = BUFFLEN;
+
+    char buff[size], buff2[size], membuff[size];
+    int timeout = 2000, ret = 0;
+    char *path = "fileforaudit", *auditpath="audit startup";
+
 
     /* Define arguments to configure local audit ioctls */
     int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
@@ -92,6 +97,7 @@ ATF_TC_BODY(mkdir_success, tc)
     /* Open /dev/auditpipe for auditing */
     fds[0].fd = open("/dev/auditpipe", O_RDONLY);
     fds[0].events = POLLIN;
+    FILE *pipefd = fdopen(fds[0].fd, "r");
     setup();
 
     /*
@@ -103,23 +109,14 @@ ATF_TC_BODY(mkdir_success, tc)
             atf_tc_fail("Poll: %s", strerror(errno));
         } else {
             if (fds[0].revents & POLLIN) {
-                ATF_REQUIRE((ret = read(fds[0].fd, buff2, \
-                     sizeof(buff2))) != ERROR);
-                /* Store the buffer in a file */
-                FILE *fd = fopen(file1, "w");
-                fwrite(buff2, 1, ret, fd);
-                fclose(fd);
-
                 /* We now have a proof that auditd(8) started smoothly */
-                getrecords(file1, file2);
+                ATF_REQUIRE(getrecords(auditpath, pipefd));
             } else {
                 /* revents is not POLLIN */
-                atf_tc_fail("Auditpipe returned an unknown event"
+                atf_tc_fail("Auditpipe returned an unknown event "
                             "%#x", fds[0].revents);
             }
         }
-
-        ATF_REQUIRE(atf_utils_grep_file("audit startup", file2));
     }
 
     /*
@@ -164,25 +161,18 @@ ATF_TC_BODY(mkdir_success, tc)
             /* ppoll(2) returns an event, check if it's the event we want */
             case 1:
                 if (fds[0].revents & POLLIN) {
-                    ATF_REQUIRE((ret = read(fds[0].fd, buff, \
-                        sizeof(buff))) != ERROR);
-                    FILE *fd = fopen(file1, "w");
-                    fwrite(buff, 1, ret, fd);
-                    fclose(fd);
-
-                    getrecords(file1, file2);
-                    if (atf_utils_grep_file("%s", file2, path)) {
-                        /* We have confirmed mkdir(2)'s audit */
+                    if (getrecords(path, pipefd)) {
+                    /* We have confirmed mkdir(2)' audit */
                         atf_tc_pass();
                     }
                 } else {
-                    atf_tc_fail("Auditpipe returned an unknown event"
+                    atf_tc_fail("Auditpipe returned an unknown event "
                                 "%#x", fds[0].revents);
                 } break;
 
             /* poll(2) timed out */
             case 0:
-                atf_tc_fail("Auditpipe did not return anything within"
+                atf_tc_fail("Auditpipe did not return anything within "
                             "the time limit"); break;
             /* poll(2) standard error */
             case ERROR:
@@ -193,6 +183,7 @@ ATF_TC_BODY(mkdir_success, tc)
         }
     }
 
+    fclose(pipefd);
     close(fds[0].fd);
 
 }

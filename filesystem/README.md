@@ -5,20 +5,20 @@ Current scenario: All the 14 included tests for File Read (fr) event class are p
 
 |  Num  |	Syscall	 |  Status
 |:-----:|:---------:|:-----------------:
-1       |open(2)	|:white_check_mark:
-2       |openat(2)	|:white_check_mark:
-3       |readlink(2)  |:white_check_mark:
-4       |readlinkat(2)|:white_check_mark:
-5       |symlink(2)	 	  |:white_check_mark:
-6       |symlinkat(2)		|:white_check_mark:
-7       |link(2)  |:white_check_mark:
-8       |linkat(2)|:white_check_mark:
-9       |mkdir(2)	 	  |:white_check_mark:
-10       |mkdirat(2)		|:white_check_mark:
-11       |mkfifo(2)  |:white_check_mark:
-12       |mkfifoat(2)|:white_check_mark:
-13       |mknod(2)  |:white_check_mark:
-14       |mknodat(2)|:white_check_mark:
+1       |open(2)	|:heavy_check_mark:
+2       |openat(2)	|:heavy_check_mark:
+3       |readlink(2)  |:heavy_check_mark:
+4       |readlinkat(2)|:heavy_check_mark:
+5       |symlink(2)	 	  |:heavy_check_mark:
+6       |symlinkat(2)		|:heavy_check_mark:
+7       |link(2)  |:heavy_check_mark:
+8       |linkat(2)|:heavy_check_mark:
+9       |mkdir(2)	 	  |:heavy_check_mark:
+10       |mkdirat(2)		|:heavy_check_mark:
+11       |mkfifo(2)  |:heavy_check_mark:
+12       |mkfifoat(2)|:heavy_check_mark:
+13       |mknod(2)  |:heavy_check_mark:
+14       |mknodat(2)|:heavy_check_mark:
 
 ## Directory Structure
 

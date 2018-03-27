@@ -37,8 +37,8 @@ getrecords(char *path, FILE *pipestream)
     /*
      * Open a stream on 'membuff' (address to memory buffer) for storing
      * the audit records in the default mode.'reclen' is the length of the
-     * available records from auditpipe and the let's the functions
-     * au_fetch_tok(3) and au_print_flags_tok(3) do their respective jobs.
+     * available records from auditpipe which is passed to the functions
+     * au_fetch_tok(3) and au_print_flags_tok(3) for further use.
      */
     FILE *memstream = fmemopen(membuff, size, "w");
     ATF_REQUIRE(reclen = au_read_rec(pipestream, &buff) != ERROR);

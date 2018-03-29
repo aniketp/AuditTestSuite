@@ -41,7 +41,7 @@ getrecords(char *path, FILE *pipestream)
      * au_fetch_tok(3) and au_print_flags_tok(3) for further use.
      */
     FILE *memstream = fmemopen(membuff, size, "w");
-    ATF_REQUIRE(reclen = au_read_rec(pipestream, &buff) != ERROR);
+    reclen = au_read_rec(pipestream, &buff);
 
     /*
      * Iterate through each BSM token, extracting the bits that are

@@ -2,11 +2,11 @@
 #include<string.h>
 #include<stdlib.h>
 #include<unistd.h>
-#include<errno.h>
-#include<fcntl.h>
+
 #include<poll.h>
 #include<time.h>
-
+#include<errno.h>
+#include<fcntl.h>
 #include<sys/stat.h>
 #include<sys/ioctl.h>
 
@@ -18,12 +18,10 @@
 #define ERROR (-1)
 #define BUFFLEN 1024
 
-static void
-setup(void)
-{
-    ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
-     { service auditd onestart && touch started_auditd ; }"));
-}
+struct pollfd fds[1];
+char *path = "fileforaudit";
+char *successreg = "fileforaudit.*return,success";
+char *failurereg = "fileforaudit.*return,failure";
 
 static bool
 get_records(char *path, FILE *pipestream)
@@ -76,12 +74,12 @@ set_preselect_mode(int filedesc, au_mask_t *fmask) {
         atf_tc_fail("Preselection mode: %s", strerror(errno));
     }
 
-    /* Set local preselection flag as (fc) for mkdir(2) */
+    /* Set local preselection flag corresponding to the audit_event*/
     if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_FLAGS, fmask) < 0) {
         atf_tc_fail("Preselection flag: %s", strerror(errno));
     }
 
-    /* This removes any outstanding record on audit pipe */
+    /* This removes any outstanding record on the auditpipe */
     if (ioctl(filedesc, AUDITPIPE_FLUSH) < 0) {
         atf_tc_fail("Auditpipe flush: %s", strerror(errno));
     }
@@ -168,6 +166,33 @@ get_audit_class(const char *name) {
     return fmask;
 }
 
+static FILE
+*setup(struct pollfd fds[], const char *name)
+{
+    au_mask_t fmask;
+    fmask = get_audit_class(name);
+
+    fds[0].fd = open("/dev/auditpipe", O_RDONLY);
+    fds[0].events = POLLIN;
+    FILE *pipestream = fdopen(fds[0].fd, "r");
+
+    ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
+     { service auditd onestart && touch started_auditd ; }"));
+
+    /* If 'started_auditd' exists, that means we started auditd */
+    if (atf_utils_file_exists("started_auditd")) {
+        check_audit_startup(fds, pipestream);
+    }
+    set_preselect_mode(fds[0].fd, &fmask);
+    return pipestream;
+}
+
+static void
+cleanup(struct pollfd fds[], FILE *pipestream) {
+    fclose(pipestream);
+    close(fds[0].fd);
+}
+
 
 /*
  * Test1: mkdir(2) success
@@ -181,31 +206,13 @@ ATF_TC_HEAD(mkdir_success, tc)
 
 ATF_TC_BODY(mkdir_success, tc)
 {
-    struct pollfd fds[1];
     mode_t mode = 0777;
-    au_mask_t fmask;
-    char *path = "fileforaudit";
-    char *regexstr = "fileforaudit.*return,success";
-    fmask = get_audit_class("fc");
-
-    /* Open /dev/auditpipe for auditing */
-    fds[0].fd = open("/dev/auditpipe", O_RDONLY);
-    fds[0].events = POLLIN;
-    FILE *pipefd = fdopen(fds[0].fd, "r");
-    setup();
-
-    /* If 'started_auditd' exists, that means we started auditd */
-    if (atf_utils_file_exists("started_auditd")) {
-        check_audit_startup(fds, pipefd);
-    }
+    FILE *pipefd = setup(fds, "fc");
 
     /* Success condition: mkdir(2) */
-    set_preselect_mode(fds[0].fd, &fmask);
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
-    check_audit(fds, regexstr, pipefd);
-
-    fclose(pipefd);
-    close(fds[0].fd);
+    check_audit(fds, successreg, pipefd);
+    cleanup(fds, pipefd);
 }
 
 ATF_TC_CLEANUP(mkdir_success, tc)
@@ -226,32 +233,14 @@ ATF_TC_HEAD(mkdir_failure, tc)
 
 ATF_TC_BODY(mkdir_failure, tc)
 {
-    struct pollfd fds[1];
     mode_t mode = 0777;
-    au_mask_t fmask;
-    char *path = "fileforaudit";
-    char *regexstr = "fileforaudit.*return,failure";
-    fmask = get_audit_class("fc");
-
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
-    /* Open /dev/auditpipe for auditing */
-    fds[0].fd = open("/dev/auditpipe", O_RDONLY);
-    fds[0].events = POLLIN;
-    FILE *pipefd = fdopen(fds[0].fd, "r");
-    setup();
-
-    /* If 'started_auditd' exists, that means we started auditd */
-    if (atf_utils_file_exists("started_auditd")) {
-        check_audit_startup(fds, pipefd);
-    }
+    FILE *pipefd = setup(fds, "fc");
 
     /* Failure condition: mkdir(2) */
-    set_preselect_mode(fds[0].fd, &fmask);
     ATF_REQUIRE_EQ(ERROR, mkdir(path, mode));
-    check_audit(fds, regexstr, pipefd);
-
-    fclose(pipefd);
-    close(fds[0].fd);
+    check_audit(fds, failurereg, pipefd);
+    cleanup(fds, pipefd);
 }
 
 ATF_TC_CLEANUP(mkdir_failure, tc)

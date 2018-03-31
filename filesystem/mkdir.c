@@ -7,7 +7,6 @@
 
 void main(){
     int filedesc1, filedesc2;
-    int filedesc = 0;
     char *dir1 = "/tmp/temp1", *dir2 = "/tmp/temp2";
     mode_t mode = 0777;
 
@@ -21,13 +20,13 @@ void main(){
 
 
     /* Success condition: mkdirat(2) */
-    if ((filedesc2 = mkdirat(filedesc, dir2, mode)) == ERROR){
+    if ((filedesc2 = mkdirat(AT_FDCWD, dir2, mode)) == ERROR){
         perror("mkdirat");
         exit(ERROR);
     }
 
     /* Failure condition: mkdirat(2) :: Directory already exists */
-    mkdirat(filedesc, dir2, mode);
+    mkdirat(AT_FDCWD, dir2, mode);
 
     /* Directory cleanup */
     int dir1_ = rmdir(dir1);

@@ -19,6 +19,7 @@
 #define BUFFLEN 1024
 
 struct pollfd fds[1];
+mode_t mode = 0777;
 char *path = "fileforaudit";
 char *successreg = "fileforaudit.*return,success";
 char *failurereg = "fileforaudit.*return,failure";
@@ -206,9 +207,7 @@ ATF_TC_HEAD(mkdir_success, tc)
 
 ATF_TC_BODY(mkdir_success, tc)
 {
-    mode_t mode = 0777;
     FILE *pipefd = setup(fds, "fc");
-
     /* Success condition: mkdir(2) */
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
     check_audit(fds, successreg, pipefd);
@@ -233,10 +232,8 @@ ATF_TC_HEAD(mkdir_failure, tc)
 
 ATF_TC_BODY(mkdir_failure, tc)
 {
-    mode_t mode = 0777;
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
     FILE *pipefd = setup(fds, "fc");
-
     /* Failure condition: mkdir(2) */
     ATF_REQUIRE_EQ(ERROR, mkdir(path, mode));
     check_audit(fds, failurereg, pipefd);
@@ -249,9 +246,62 @@ ATF_TC_CLEANUP(mkdir_failure, tc)
 }
 
 
+/*
+ * Test3: mkdirat(2) success
+ */
+ATF_TC_WITH_CLEANUP(mkdirat_success);
+ATF_TC_HEAD(mkdirat_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mkdirat(2) in success mode");
+}
+
+ATF_TC_BODY(mkdirat_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    /* Success condition: mkdirat(2) */
+    ATF_REQUIRE_EQ(0, mkdirat(AT_FDCWD, path, mode));
+    check_audit(fds, successreg, pipefd);
+    cleanup(fds, pipefd);
+}
+
+ATF_TC_CLEANUP(mkdirat_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test4: mkdir(2) failure
+ */
+ATF_TC_WITH_CLEANUP(mkdirat_failure);
+ATF_TC_HEAD(mkdirat_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mkdirat(2) in failure mode");
+}
+
+ATF_TC_BODY(mkdirat_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, mkdirat(AT_FDCWD, path, mode));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure condition: mkdirat(2) */
+    ATF_REQUIRE_EQ(ERROR, mkdirat(AT_FDCWD, path, mode));
+    check_audit(fds, failurereg, pipefd);
+    cleanup(fds, pipefd);
+}
+
+ATF_TC_CLEANUP(mkdirat_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
     ATF_TP_ADD_TC(tp, mkdir_success);
     ATF_TP_ADD_TC(tp, mkdir_failure);
+    ATF_TP_ADD_TC(tp, mkdirat_success);
+    ATF_TP_ADD_TC(tp, mkdirat_failure);
     return atf_no_error();
 }

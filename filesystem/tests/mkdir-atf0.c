@@ -1,3 +1,31 @@
+/*-
+ * Copyright 2018 Aniket Pandey
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
 #include<stdio.h>
 #include<string.h>
 #include<stdlib.h>
@@ -44,7 +72,7 @@ get_records(char *path, FILE *pipestream)
 
     /*
      * Iterate through each BSM token, extracting the bits that are
-     * required to starting processing sequences.
+     * required to start processing the token sequences.
      */
     while (bytesread < reclen) {
         if (au_fetch_tok(&token, buff + bytesread, \
@@ -150,6 +178,10 @@ check_audit(struct pollfd fds[], char *path, FILE *pipestream) {
                 atf_tc_fail("Poll returned an unknown event");
         }
     }
+
+    /* Cleanup */
+    fclose(pipestream);
+    close(fds[0].fd);
 }
 
 /*
@@ -188,12 +220,6 @@ static FILE
     return pipestream;
 }
 
-static void
-cleanup(struct pollfd fds[], FILE *pipestream) {
-    fclose(pipestream);
-    close(fds[0].fd);
-}
-
 
 /*
  * Test1: mkdir(2) success
@@ -208,10 +234,8 @@ ATF_TC_HEAD(mkdir_success, tc)
 ATF_TC_BODY(mkdir_success, tc)
 {
     FILE *pipefd = setup(fds, "fc");
-    /* Success condition: mkdir(2) */
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
     check_audit(fds, successreg, pipefd);
-    cleanup(fds, pipefd);
 }
 
 ATF_TC_CLEANUP(mkdir_success, tc)
@@ -234,10 +258,9 @@ ATF_TC_BODY(mkdir_failure, tc)
 {
     ATF_REQUIRE_EQ(0, mkdir(path, mode));
     FILE *pipefd = setup(fds, "fc");
-    /* Failure condition: mkdir(2) */
+    /* Failure reason: directory already exists */
     ATF_REQUIRE_EQ(ERROR, mkdir(path, mode));
     check_audit(fds, failurereg, pipefd);
-    cleanup(fds, pipefd);
 }
 
 ATF_TC_CLEANUP(mkdir_failure, tc)
@@ -259,10 +282,8 @@ ATF_TC_HEAD(mkdirat_success, tc)
 ATF_TC_BODY(mkdirat_success, tc)
 {
     FILE *pipefd = setup(fds, "fc");
-    /* Success condition: mkdirat(2) */
     ATF_REQUIRE_EQ(0, mkdirat(AT_FDCWD, path, mode));
     check_audit(fds, successreg, pipefd);
-    cleanup(fds, pipefd);
 }
 
 ATF_TC_CLEANUP(mkdirat_success, tc)
@@ -272,7 +293,7 @@ ATF_TC_CLEANUP(mkdirat_success, tc)
 
 
 /*
- * Test4: mkdir(2) failure
+ * Test4: mkdirat(2) failure
  */
 ATF_TC_WITH_CLEANUP(mkdirat_failure);
 ATF_TC_HEAD(mkdirat_failure, tc)
@@ -285,10 +306,9 @@ ATF_TC_BODY(mkdirat_failure, tc)
 {
     ATF_REQUIRE_EQ(0, mkdirat(AT_FDCWD, path, mode));
     FILE *pipefd = setup(fds, "fc");
-    /* Failure condition: mkdirat(2) */
+    /* Failure reason: directory already exists */
     ATF_REQUIRE_EQ(ERROR, mkdirat(AT_FDCWD, path, mode));
     check_audit(fds, failurereg, pipefd);
-    cleanup(fds, pipefd);
 }
 
 ATF_TC_CLEANUP(mkdirat_failure, tc)
@@ -297,11 +317,11 @@ ATF_TC_CLEANUP(mkdirat_failure, tc)
 }
 
 
-ATF_TP_ADD_TCS(tp)
+ATF_TP_ADD_TCS(tc)
 {
-    ATF_TP_ADD_TC(tp, mkdir_success);
-    ATF_TP_ADD_TC(tp, mkdir_failure);
-    ATF_TP_ADD_TC(tp, mkdirat_success);
-    ATF_TP_ADD_TC(tp, mkdirat_failure);
+    ATF_TP_ADD_TC(tc, mkdir_success);
+    ATF_TP_ADD_TC(tc, mkdir_failure);
+    ATF_TP_ADD_TC(tc, mkdirat_success);
+    ATF_TP_ADD_TC(tc, mkdirat_failure);
     return atf_no_error();
 }

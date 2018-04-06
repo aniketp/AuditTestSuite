@@ -49,6 +49,7 @@
 
 struct pollfd fds[1];
 mode_t mode = 0777;
+dev_t dev =  0;
 char *path = "fileforaudit";
 char *successreg = "fileforaudit.*return,success";
 char *failurereg = "fileforaudit.*return,failure";
@@ -418,16 +419,119 @@ ATF_TC_CLEANUP(mkfifoat_failure, tc)
 }
 
 
+/*
+ * Test9: mknod(2) success
+ */
+ATF_TC_WITH_CLEANUP(mknod_success);
+ATF_TC_HEAD(mknod_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mknod(2) in success mode");
+}
+
+ATF_TC_BODY(mknod_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, mknod(path, S_IFIFO | S_IRWXO, dev));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(mknod_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test10: mknod(2) failure
+ */
+ATF_TC_WITH_CLEANUP(mknod_failure);
+ATF_TC_HEAD(mknod_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mknod(2) in failure mode");
+}
+
+ATF_TC_BODY(mknod_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, mknod(path, S_IFIFO | S_IRWXO, dev));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: FIFO node already exists */
+    ATF_REQUIRE_EQ(ERROR, mknod(path, S_IFIFO | S_IRWXO, dev));
+    check_audit(fds, failurereg, pipefd);
+}
+
+
+ATF_TC_CLEANUP(mknod_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test11: mknodat(2) success
+ */
+ATF_TC_WITH_CLEANUP(mknodat_success);
+ATF_TC_HEAD(mknodat_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mknodat(2) in success mode");
+}
+
+ATF_TC_BODY(mknodat_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, mknodat(AT_FDCWD, path, S_IFIFO | S_IRWXO, dev));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(mknodat_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test12: mknodat(2) failure
+ */
+ATF_TC_WITH_CLEANUP(mknodat_failure);
+ATF_TC_HEAD(mknodat_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mknodat(2) in failure mode");
+}
+
+ATF_TC_BODY(mknodat_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, mknodat(AT_FDCWD, path, S_IFIFO | S_IRWXO, dev));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: FIFO node already exists */
+    ATF_REQUIRE_EQ(ERROR, mknodat(AT_FDCWD, path, S_IFIFO | S_IRWXO, dev));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(mknodat_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
 ATF_TP_ADD_TCS(tc)
 {
     ATF_TP_ADD_TC(tc, mkdir_success);
     ATF_TP_ADD_TC(tc, mkdir_failure);
     ATF_TP_ADD_TC(tc, mkdirat_success);
     ATF_TP_ADD_TC(tc, mkdirat_failure);
+
     ATF_TP_ADD_TC(tc, mkfifo_success);
     ATF_TP_ADD_TC(tc, mkfifo_failure);
     ATF_TP_ADD_TC(tc, mkfifoat_success);
     ATF_TP_ADD_TC(tc, mkfifoat_failure);
+
+    ATF_TP_ADD_TC(tc, mknod_success);
+    ATF_TP_ADD_TC(tc, mknod_failure);
+    ATF_TP_ADD_TC(tc, mknodat_success);
+    ATF_TP_ADD_TC(tc, mknodat_failure);
 
     return atf_no_error();
 }

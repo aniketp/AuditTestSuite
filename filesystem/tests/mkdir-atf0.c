@@ -36,6 +36,7 @@
 #include<errno.h>
 #include<fcntl.h>
 #include<sys/stat.h>
+#include<sys/types.h>
 #include<sys/ioctl.h>
 
 #include<atf-c.h>
@@ -220,6 +221,9 @@ static FILE
     return pipestream;
 }
 
+/*
+ *  Tests for file-create audit events
+ */
 
 /*
  * Test1: mkdir(2) success
@@ -317,11 +321,113 @@ ATF_TC_CLEANUP(mkdirat_failure, tc)
 }
 
 
+/*
+ * Test5: mkfifo(2) success
+ */
+ATF_TC_WITH_CLEANUP(mkfifo_success);
+ATF_TC_HEAD(mkfifo_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mkfifo(2) in success mode");
+}
+
+ATF_TC_BODY(mkfifo_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, mkfifo(path, mode));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(mkfifo_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test6: mkfifo(2) failure
+ */
+ATF_TC_WITH_CLEANUP(mkfifo_failure);
+ATF_TC_HEAD(mkfifo_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mkfifo(2) in failure mode");
+}
+
+ATF_TC_BODY(mkfifo_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, mkfifo(path, mode));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: FIFO already exists */
+    ATF_REQUIRE_EQ(ERROR, mkfifo(path, mode));
+    check_audit(fds, failurereg, pipefd);
+}
+
+
+ATF_TC_CLEANUP(mkfifo_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test7: mkfifoat(2) success
+ */
+ATF_TC_WITH_CLEANUP(mkfifoat_success);
+ATF_TC_HEAD(mkfifoat_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mkfifoat(2) in success mode");
+}
+
+ATF_TC_BODY(mkfifoat_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, mkfifoat(AT_FDCWD, path, mode));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(mkfifoat_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+ * Test8: mkfifoat(2) failure
+ */
+ATF_TC_WITH_CLEANUP(mkfifoat_failure);
+ATF_TC_HEAD(mkfifoat_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "mkfifoat(2) in failure mode");
+}
+
+ATF_TC_BODY(mkfifoat_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, mkfifoat(AT_FDCWD, path, mode));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: FIFO already exists */
+    ATF_REQUIRE_EQ(ERROR, mkfifoat(AT_FDCWD, path, mode));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(mkfifoat_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
 ATF_TP_ADD_TCS(tc)
 {
     ATF_TP_ADD_TC(tc, mkdir_success);
     ATF_TP_ADD_TC(tc, mkdir_failure);
     ATF_TP_ADD_TC(tc, mkdirat_success);
     ATF_TP_ADD_TC(tc, mkdirat_failure);
+    ATF_TP_ADD_TC(tc, mkfifo_success);
+    ATF_TP_ADD_TC(tc, mkfifo_failure);
+    ATF_TP_ADD_TC(tc, mkfifoat_success);
+    ATF_TP_ADD_TC(tc, mkfifoat_failure);
+
     return atf_no_error();
 }

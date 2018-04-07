@@ -1,7 +1,7 @@
 
 ## Testing Status
 
-Current scenario: All the 14 included tests for File Read (fr) event class are passing in both *Success* and *Failure* modes.
+Current scenario: All the 16 included tests for File Read (fr) event class are passing in both *Success* and *Failure* modes.
 
 |  Num  |	Syscall	 |  Status
 |:-----:|:---------:|:-----------------:
@@ -19,6 +19,8 @@ Current scenario: All the 14 included tests for File Read (fr) event class are p
 12       |mkfifoat(2)|:heavy_check_mark:
 13       |mknod(2)  |:heavy_check_mark:
 14       |mknodat(2)|:heavy_check_mark:
+15       |rename(2)|:heavy_check_mark:
+16       |renameat(2)|:heavy_check_mark:
 
 ## Directory Structure
 

@@ -39,6 +39,9 @@ void main(){
         exit(ERROR);
     }
 
+    close((int) filedesc1);
+    close((int) filedesc2);
+
     /* Hardlink and file cleanup */
     int file1_ = unlink(file1);
     int file2_ = unlink(file2);

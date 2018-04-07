@@ -35,4 +35,12 @@ void main(){
     close((int) filedesc1);
     close((int) filedesc2);
 
+    /* File cleanup */
+    int file1_ = unlink(sym);
+    int file2_ = unlink(err);
+    if ((file1_ == ERROR) || (file2_ == ERROR)){
+        perror("unlink");
+        exit(ERROR);
+    }
+
 }

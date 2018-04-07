@@ -426,6 +426,7 @@ ATF_TC_HEAD(mknod_success, tc)
 {
     atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
                                     "mknod(2) in success mode");
+    atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknod_success, tc)
@@ -449,6 +450,7 @@ ATF_TC_HEAD(mknod_failure, tc)
 {
     atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
                                     "mknod(2) in failure mode");
+    atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknod_failure, tc)
@@ -474,6 +476,7 @@ ATF_TC_HEAD(mknodat_success, tc)
 {
     atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
                                     "mknodat(2) in success mode");
+    atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknodat_success, tc)
@@ -497,6 +500,7 @@ ATF_TC_HEAD(mknodat_failure, tc)
 {
     atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
                                     "mknodat(2) in failure mode");
+    atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknodat_failure, tc)
@@ -616,27 +620,27 @@ ATF_TC_CLEANUP(renameat_failure, tc)
 }
 
 
-ATF_TP_ADD_TCS(tc)
+ATF_TP_ADD_TCS(tp)
 {
-    ATF_TP_ADD_TC(tc, mkdir_success);
-    ATF_TP_ADD_TC(tc, mkdir_failure);
-    ATF_TP_ADD_TC(tc, mkdirat_success);
-    ATF_TP_ADD_TC(tc, mkdirat_failure);
+    ATF_TP_ADD_TC(tp, mkdir_success);
+    ATF_TP_ADD_TC(tp, mkdir_failure);
+    ATF_TP_ADD_TC(tp, mkdirat_success);
+    ATF_TP_ADD_TC(tp, mkdirat_failure);
 
-    ATF_TP_ADD_TC(tc, mkfifo_success);
-    ATF_TP_ADD_TC(tc, mkfifo_failure);
-    ATF_TP_ADD_TC(tc, mkfifoat_success);
-    ATF_TP_ADD_TC(tc, mkfifoat_failure);
+    ATF_TP_ADD_TC(tp, mkfifo_success);
+    ATF_TP_ADD_TC(tp, mkfifo_failure);
+    ATF_TP_ADD_TC(tp, mkfifoat_success);
+    ATF_TP_ADD_TC(tp, mkfifoat_failure);
 
-    ATF_TP_ADD_TC(tc, mknod_success);
-    ATF_TP_ADD_TC(tc, mknod_failure);
-    ATF_TP_ADD_TC(tc, mknodat_success);
-    ATF_TP_ADD_TC(tc, mknodat_failure);
+    ATF_TP_ADD_TC(tp, mknod_success);
+    ATF_TP_ADD_TC(tp, mknod_failure);
+    ATF_TP_ADD_TC(tp, mknodat_success);
+    ATF_TP_ADD_TC(tp, mknodat_failure);
 
-    ATF_TP_ADD_TC(tc, rename_success);
-    ATF_TP_ADD_TC(tc, rename_failure);
-    ATF_TP_ADD_TC(tc, renameat_success);
-    ATF_TP_ADD_TC(tc, renameat_failure);
+    ATF_TP_ADD_TC(tp, rename_success);
+    ATF_TP_ADD_TC(tp, rename_failure);
+    ATF_TP_ADD_TC(tp, renameat_success);
+    ATF_TP_ADD_TC(tp, renameat_failure);
 
     return atf_no_error();
 }

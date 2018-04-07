@@ -34,4 +34,12 @@ void main(){
     /* Failure condition: readlinkat(2) */
     readlinkat(fd, err, buff2, sizeof(buff2)-1);
 
+    /* File cleanup */
+    int file1_ = unlink(sym);
+    int file2_ = unlink(err);
+    if ((file1_ == ERROR) || (file2_ == ERROR)){
+        perror("unlink");
+        exit(ERROR);
+    }
+
 }

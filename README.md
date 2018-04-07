@@ -58,4 +58,4 @@ And execute the testing script.
 
 ### Testing Status
 
-Current scenario: All the 48 included tests are passing in both *Success* and *Failure* modes.
+Current scenario: All the 50 included tests are passing in both *Success* and *Failure* modes.

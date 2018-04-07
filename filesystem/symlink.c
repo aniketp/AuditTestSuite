@@ -29,6 +29,10 @@ void main(){
     /* Failure condition: symlinkat(2) :: File already exists */
     symlinkat(file2, filedesc, sym2);
 
+    close((int) filedesc);
+    close((int) filedesc1);
+    close((int) filedesc2);
+
     /* Symlink cleanup */
     int sym1_ = unlink(sym1);
     int sym2_ = unlink(sym2);

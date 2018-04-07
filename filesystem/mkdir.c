@@ -28,6 +28,9 @@ void main(){
     /* Failure condition: mkdirat(2) :: Directory already exists */
     mkdirat(AT_FDCWD, dir2, mode);
 
+    close((int) filedesc1);
+    close((int) filedesc2);
+
     /* Directory cleanup */
     int dir1_ = rmdir(dir1);
     int dir2_ = rmdir(dir2);

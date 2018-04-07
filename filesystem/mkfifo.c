@@ -30,6 +30,10 @@ void main(){
     /* Failure condition: mkfifoat(2) :: fifo already exists */
     mkfifoat(filedesc, fifo2, mode);
 
+    close((int) filedesc);
+    close((int) filedesc1);
+    close((int) filedesc2);
+
     /* Fifo cleanup */
     int fifo1_ = unlink(fifo1);
     int fifo2_ = unlink(fifo2);

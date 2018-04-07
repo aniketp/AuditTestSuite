@@ -33,6 +33,10 @@ void main(){
     /* Failure condition: mknodat(2) :: fifo already exists */
     mknodat(filedesc, fifo2, S_IFIFO | S_IRWXO, dev);
 
+    close((int) filedesc);
+    close((int) filedesc1);
+    close((int) filedesc2);
+
     /* Node cleanup */
     int fifo1_ = unlink(fifo1);
     int fifo2_ = unlink(fifo2);

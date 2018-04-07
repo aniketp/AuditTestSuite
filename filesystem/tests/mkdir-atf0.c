@@ -364,7 +364,6 @@ ATF_TC_BODY(mkfifo_failure, tc)
     check_audit(fds, failurereg, pipefd);
 }
 
-
 ATF_TC_CLEANUP(mkfifo_failure, tc)
 {
     system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
@@ -461,7 +460,6 @@ ATF_TC_BODY(mknod_failure, tc)
     check_audit(fds, failurereg, pipefd);
 }
 
-
 ATF_TC_CLEANUP(mknod_failure, tc)
 {
     system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
@@ -516,6 +514,108 @@ ATF_TC_CLEANUP(mknodat_failure, tc)
 }
 
 
+/*
+* Test13: rename(2) success
+*/
+ATF_TC_WITH_CLEANUP(rename_success);
+ATF_TC_HEAD(rename_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "rename(2) in success mode");
+}
+
+ATF_TC_BODY(rename_success, tc)
+{
+    char *rnmfile = "renamedfile";
+    ATF_REQUIRE(open(path, O_CREAT) != ERROR);
+
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, rename(path, rnmfile));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(rename_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test14: rename(2) failure
+*/
+ATF_TC_WITH_CLEANUP(rename_failure);
+ATF_TC_HEAD(rename_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "rename(2) in failure mode");
+}
+
+ATF_TC_BODY(rename_failure, tc)
+{
+    char *rnmfile = "renamedfile";
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: file does not exist */
+    ATF_REQUIRE_EQ(ERROR, rename(path, rnmfile));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(rename_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test15: renameat(2) success
+*/
+ATF_TC_WITH_CLEANUP(renameat_success);
+ATF_TC_HEAD(renameat_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "renameat(2) in success mode");
+}
+
+ATF_TC_BODY(renameat_success, tc)
+{
+    char *rnmfile = "renamedfile";
+    ATF_REQUIRE(open(path, O_CREAT) != ERROR);
+
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, renameat(AT_FDCWD, path, AT_FDCWD, rnmfile));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(renameat_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test16: renameat(2) failure
+*/
+ATF_TC_WITH_CLEANUP(renameat_failure);
+ATF_TC_HEAD(renameat_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "renameat(2) in failure mode");
+}
+
+ATF_TC_BODY(renameat_failure, tc)
+{
+    char *rnmfile = "renamedfile";
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: file does not exist */
+    ATF_REQUIRE_EQ(ERROR, renameat(AT_FDCWD, path, AT_FDCWD, rnmfile));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(renameat_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
 ATF_TP_ADD_TCS(tc)
 {
     ATF_TP_ADD_TC(tc, mkdir_success);
@@ -532,6 +632,11 @@ ATF_TP_ADD_TCS(tc)
     ATF_TP_ADD_TC(tc, mknod_failure);
     ATF_TP_ADD_TC(tc, mknodat_success);
     ATF_TP_ADD_TC(tc, mknodat_failure);
+
+    ATF_TP_ADD_TC(tc, rename_success);
+    ATF_TP_ADD_TC(tc, rename_failure);
+    ATF_TP_ADD_TC(tc, renameat_success);
+    ATF_TP_ADD_TC(tc, renameat_failure);
 
     return atf_no_error();
 }

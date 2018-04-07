@@ -530,11 +530,9 @@ ATF_TC_HEAD(rename_success, tc)
 
 ATF_TC_BODY(rename_success, tc)
 {
-    char *rnmfile = "renamedfile";
     ATF_REQUIRE(open(path, O_CREAT) != ERROR);
-
     FILE *pipefd = setup(fds, "fc");
-    ATF_REQUIRE_EQ(0, rename(path, rnmfile));
+    ATF_REQUIRE_EQ(0, rename(path, "renamed"));
     check_audit(fds, successreg, pipefd);
 }
 
@@ -556,10 +554,9 @@ ATF_TC_HEAD(rename_failure, tc)
 
 ATF_TC_BODY(rename_failure, tc)
 {
-    char *rnmfile = "renamedfile";
     FILE *pipefd = setup(fds, "fc");
     /* Failure reason: file does not exist */
-    ATF_REQUIRE_EQ(ERROR, rename(path, rnmfile));
+    ATF_REQUIRE_EQ(ERROR, rename(path, "renamed"));
     check_audit(fds, failurereg, pipefd);
 }
 
@@ -581,11 +578,9 @@ ATF_TC_HEAD(renameat_success, tc)
 
 ATF_TC_BODY(renameat_success, tc)
 {
-    char *rnmfile = "renamedfile";
     ATF_REQUIRE(open(path, O_CREAT) != ERROR);
-
     FILE *pipefd = setup(fds, "fc");
-    ATF_REQUIRE_EQ(0, renameat(AT_FDCWD, path, AT_FDCWD, rnmfile));
+    ATF_REQUIRE_EQ(0, renameat(AT_FDCWD, path, AT_FDCWD, "renamed"));
     check_audit(fds, successreg, pipefd);
 }
 
@@ -607,14 +602,205 @@ ATF_TC_HEAD(renameat_failure, tc)
 
 ATF_TC_BODY(renameat_failure, tc)
 {
-    char *rnmfile = "renamedfile";
     FILE *pipefd = setup(fds, "fc");
     /* Failure reason: file does not exist */
-    ATF_REQUIRE_EQ(ERROR, renameat(AT_FDCWD, path, AT_FDCWD, rnmfile));
+    ATF_REQUIRE_EQ(ERROR, renameat(AT_FDCWD, path, AT_FDCWD, "renamed"));
     check_audit(fds, failurereg, pipefd);
 }
 
 ATF_TC_CLEANUP(renameat_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test17: link(2) success
+*/
+ATF_TC_WITH_CLEANUP(link_success);
+ATF_TC_HEAD(link_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "link(2) in success mode");
+}
+
+ATF_TC_BODY(link_success, tc)
+{
+    ATF_REQUIRE(open(path, O_CREAT) != ERROR);
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, link(path, "hardlink"));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(link_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test18: link(2) failure
+*/
+ATF_TC_WITH_CLEANUP(link_failure);
+ATF_TC_HEAD(link_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "link(2) in failure mode");
+}
+
+ATF_TC_BODY(link_failure, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: file does not exist */
+    ATF_REQUIRE_EQ(ERROR, link(path, "hardlink"));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(link_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test19: linkat(2) success
+*/
+ATF_TC_WITH_CLEANUP(linkat_success);
+ATF_TC_HEAD(linkat_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "linkat(2) in success mode");
+}
+
+ATF_TC_BODY(linkat_success, tc)
+{
+    ATF_REQUIRE(open(path, O_CREAT) != ERROR);
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, linkat(AT_FDCWD, path, AT_FDCWD, "hardlink", 0));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(linkat_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test20: linkat(2) failure
+*/
+ATF_TC_WITH_CLEANUP(linkat_failure);
+ATF_TC_HEAD(linkat_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "linkat(2) in failure mode");
+}
+
+ATF_TC_BODY(linkat_failure, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: file does not exist */
+    ATF_REQUIRE_EQ(ERROR, linkat(AT_FDCWD, path, AT_FDCWD, "hardlink", 0));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(linkat_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test21: symlink(2) success
+*/
+ATF_TC_WITH_CLEANUP(symlink_success);
+ATF_TC_HEAD(symlink_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "symlink(2) in success mode");
+}
+
+ATF_TC_BODY(symlink_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, symlink(path, "symlink"));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(symlink_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test22: symlink(2) failure
+*/
+ATF_TC_WITH_CLEANUP(symlink_failure);
+ATF_TC_HEAD(symlink_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "symlink(2) in failure mode");
+}
+
+ATF_TC_BODY(symlink_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, symlink(path, "symlink"));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: symbolic link already exists */
+    ATF_REQUIRE_EQ(ERROR, symlink(path, "symlink"));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(symlink_failure, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test23: symlinkat(2) success
+*/
+ATF_TC_WITH_CLEANUP(symlinkat_success);
+ATF_TC_HEAD(symlinkat_success, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "symlinkat(2) in success mode");
+}
+
+ATF_TC_BODY(symlinkat_success, tc)
+{
+    FILE *pipefd = setup(fds, "fc");
+    ATF_REQUIRE_EQ(0, symlinkat(path, AT_FDCWD, "hardlink"));
+    check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(symlinkat_success, tc)
+{
+    system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
+}
+
+
+/*
+* Test24: symlinkat(2) failure
+*/
+ATF_TC_WITH_CLEANUP(symlinkat_failure);
+ATF_TC_HEAD(symlinkat_failure, tc)
+{
+    atf_tc_set_md_var(tc, "descr", "Checks for the successful audit of "
+                                    "symlinkat(2) in failure mode");
+}
+
+ATF_TC_BODY(symlinkat_failure, tc)
+{
+    ATF_REQUIRE_EQ(0, symlinkat(path, AT_FDCWD, "symlink"));
+    FILE *pipefd = setup(fds, "fc");
+    /* Failure reason: symbolic link already exists */
+    ATF_REQUIRE_EQ(ERROR, symlinkat(path, AT_FDCWD, "symlink"));
+    check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(symlinkat_failure, tc)
 {
     system("[ -f started_auditd ] && service auditd onestop > /dev/null 2>&1");
 }
@@ -641,6 +827,16 @@ ATF_TP_ADD_TCS(tp)
     ATF_TP_ADD_TC(tp, rename_failure);
     ATF_TP_ADD_TC(tp, renameat_success);
     ATF_TP_ADD_TC(tp, renameat_failure);
+
+    ATF_TP_ADD_TC(tp, link_success);
+    ATF_TP_ADD_TC(tp, link_failure);
+    ATF_TP_ADD_TC(tp, linkat_success);
+    ATF_TP_ADD_TC(tp, linkat_failure);
+
+    ATF_TP_ADD_TC(tp, symlink_success);
+    ATF_TP_ADD_TC(tp, symlink_failure);
+    ATF_TP_ADD_TC(tp, symlinkat_success);
+    ATF_TP_ADD_TC(tp, symlinkat_failure);
 
     return atf_no_error();
 }

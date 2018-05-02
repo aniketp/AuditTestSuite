@@ -27,6 +27,11 @@
  */
 
 
+#include<poll.h>
+#include<stdio.h>
+#include<stdbool.h>
+#include<bsm/audit.h>
+
 #ifndef _SETUP_H_
 #define _SETUP_H_
 

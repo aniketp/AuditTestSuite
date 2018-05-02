@@ -27,23 +27,16 @@
  */
 
 
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include<unistd.h>
-
-#include<poll.h>
-#include<time.h>
-#include<errno.h>
-#include<fcntl.h>
-#include<sys/stat.h>
-#include<sys/types.h>
-#include<sys/ioctl.h>
-
-#include<atf-c.h>
-#include<bsm/audit.h>
-#include<bsm/libbsm.h>
-#include<security/audit/audit_ioctl.h>
+#include <time.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <atf-c.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <bsm/libbsm.h>
+#include <security/audit/audit_ioctl.h>
 
 #include "setup.h"
 

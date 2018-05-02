@@ -26,6 +26,13 @@
  * $FreeBSD$
  */
 
+
+#include <atf-c.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "setup.h"
 
 static struct pollfd fds[1];

@@ -47,20 +47,20 @@
 #define ERROR (-1)
 #define BUFFLEN 1024
 
-struct pollfd fds[1];
-mode_t mode = 0777;
-dev_t dev =  0;
-char *path = "fileforaudit";
-char *successreg = "fileforaudit.*return,success";
-char *failurereg = "fileforaudit.*return,failure";
+static struct pollfd fds[1];
+static mode_t mode = 0777;
+static dev_t dev =  0;
+static const char *path = (const char *)"fileforaudit";
+static const char *successreg = (const char *)"fileforaudit.*return,success";
+static const char *failurereg = (const char *)"fileforaudit.*return,failure";
 
 static bool
-get_records(char *path, FILE *pipestream)
+get_records(const char *filepath, FILE *pipestream)
 {
     u_char *buff;
     tokenstr_t token;
     ssize_t size = BUFFLEN;
-    char *del = ",", membuff[size];
+    char membuff[size], del[] = ",";
     int reclen, bytesread = 0;
 
     /*
@@ -83,12 +83,12 @@ get_records(char *path, FILE *pipestream)
         };
 
     /* Print the tokens as they are obtained, in their default form */
-        au_print_flags_tok(memstream, &token, del, AU_OFLAG_NONE);
+        au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
         bytesread += token.len;
     }
 
     free(buff); fclose(memstream);
-    return atf_utils_grep_string("%s", membuff, path);
+    return atf_utils_grep_string("%s", membuff, filepath);
 }
 
 /*
@@ -120,20 +120,20 @@ set_preselect_mode(int filedesc, au_mask_t *fmask) {
  * Check if the auditd(8) startup was properly received at the auditpipe
  */
 static void
-check_audit_startup(struct pollfd fds[], FILE *pipestream) {
+check_audit_startup(struct pollfd fd[], FILE *pipestream) {
     int timeout = 2000;
-    char *auditpath = "audit startup";
+    const char *auditpath = (const char *)"audit startup";
 
     if (poll(fds, 1, timeout) < 0) {
         atf_tc_fail("Poll: %s", strerror(errno));
     } else {
-        if (fds[0].revents & POLLIN) {
+        if (fd[0].revents & POLLIN) {
             /* We now have a proof that auditd(8) started smoothly */
             ATF_REQUIRE(get_records(auditpath, pipestream));
         } else {
             /* revents is not POLLIN */
             atf_tc_fail("Auditpipe returned an unknown event "
-                        "%#x", fds[0].revents);
+                        "%#x", fd[0].revents);
         }
     }
 }
@@ -143,7 +143,7 @@ check_audit_startup(struct pollfd fds[], FILE *pipestream) {
  * we want else repeat the procedure until ppoll(2) times out.
  */
 static void
-check_audit(struct pollfd fds[], char *path, FILE *pipestream) {
+check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream) {
     struct timespec curptr, endptr;
 
     /* Set the expire time for poll(2) while waiting for mkdir(2) */
@@ -155,17 +155,17 @@ check_audit(struct pollfd fds[], char *path, FILE *pipestream) {
         ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &curptr));
         curptr.tv_sec = endptr.tv_sec - curptr.tv_sec;
 
-        switch(ppoll(fds, 1, &curptr, NULL)) {
+        switch(ppoll(fd, 1, &curptr, NULL)) {
             /* ppoll(2) returns an event, check if it's the event we want */
             case 1:
-                if (fds[0].revents & POLLIN) {
-                    if (get_records(path, pipestream)) {
+                if (fd[0].revents & POLLIN) {
+                    if (get_records(filepath, pipestream)) {
                     /* We have confirmed mkdir(2)' audit */
                         atf_tc_pass();
                     }
                 } else {
                     atf_tc_fail("Auditpipe returned an unknown event "
-                                "%#x", fds[0].revents);
+                                "%#x", fd[0].revents);
                 } break;
 
             /* poll(2) timed out */
@@ -183,7 +183,7 @@ check_audit(struct pollfd fds[], char *path, FILE *pipestream) {
 
     /* Cleanup */
     fclose(pipestream);
-    close(fds[0].fd);
+    close(fd[0].fd);
 }
 
 /*
@@ -202,14 +202,14 @@ get_audit_class(const char *name) {
 }
 
 static FILE
-*setup(struct pollfd fds[], const char *name)
+*setup(struct pollfd fd[], const char *name)
 {
     au_mask_t fmask;
     fmask = get_audit_class(name);
 
-    fds[0].fd = open("/dev/auditpipe", O_RDONLY);
-    fds[0].events = POLLIN;
-    FILE *pipestream = fdopen(fds[0].fd, "r");
+    fd[0].fd = open("/dev/auditpipe", O_RDONLY);
+    fd[0].events = POLLIN;
+    FILE *pipestream = fdopen(fd[0].fd, "r");
 
     ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
      { service auditd onestart && touch started_auditd ; }"));
@@ -218,7 +218,7 @@ static FILE
     if (atf_utils_file_exists("started_auditd")) {
         check_audit_startup(fds, pipestream);
     }
-    set_preselect_mode(fds[0].fd, &fmask);
+    set_preselect_mode(fd[0].fd, &fmask);
     return pipestream;
 }
 

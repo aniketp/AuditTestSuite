@@ -6,6 +6,4 @@ CMakeLists.txt
 # Idea
 .idea
 
-# Object
-network
-network.core
+sockets/temp

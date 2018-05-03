@@ -133,7 +133,7 @@ void
 check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream) {
     struct timespec curptr, endptr;
 
-    /* Set the expire time for poll(2) while waiting for mkdir(2) */
+    /* Set the expire time for poll(2) while waiting for syscall audit */
     ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endptr));
     endptr.tv_sec += 5;
 
@@ -147,7 +147,7 @@ check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream) {
             case 1:
                 if (fd[0].revents & POLLIN) {
                     if (get_records(filepath, pipestream)) {
-                    /* We have confirmed mkdir(2)' audit */
+                    /* We have confirmed syscall's audit */
                         atf_tc_pass();
                     }
                 } else {

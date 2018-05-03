@@ -1,14 +1,16 @@
 # $FreeBSD$
 
-CFLAGS+=        -I${.CURDIR:H:H}
-LDFLAGS+=       -lbsm
+TESTSDIR=	${TESTSBASE}/sys/audit
 
-TESTSDIR=       ${TESTSBASE}/sys/audit
+ATF_TESTS_C=	file-create
 
-ATF_TESTS_C+=   file-create
-SRCS.file-create+=file-create.c
-SRCS.file-create+=setup.c
+SRCS.file-create=	file-create.c
+SRCS.file-create+=	setup.c
+
 TEST_METADATA.file-create+= timeout="30"
-WARNS?= 6
+WARNS?=	6
+
+CFLAGS+=	-I${.CURDIR:H:H}
+LDFLAGS+=	-lbsm
 
 .include <bsd.test.mk>

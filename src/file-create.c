@@ -335,8 +335,8 @@ ATF_TC_CLEANUP(mknodat_failure, tc)
 
 
 /*
-* Test13: rename(2) success
-*/
+ * Test13: rename(2) success
+ */
 ATF_TC_WITH_CLEANUP(rename_success);
 ATF_TC_HEAD(rename_success, tc)
 {
@@ -359,8 +359,8 @@ ATF_TC_CLEANUP(rename_success, tc)
 
 
 /*
-* Test14: rename(2) failure
-*/
+ * Test14: rename(2) failure
+ */
 ATF_TC_WITH_CLEANUP(rename_failure);
 ATF_TC_HEAD(rename_failure, tc)
 {
@@ -383,8 +383,8 @@ ATF_TC_CLEANUP(rename_failure, tc)
 
 
 /*
-* Test15: renameat(2) success
-*/
+ * Test15: renameat(2) success
+ */
 ATF_TC_WITH_CLEANUP(renameat_success);
 ATF_TC_HEAD(renameat_success, tc)
 {
@@ -407,8 +407,8 @@ ATF_TC_CLEANUP(renameat_success, tc)
 
 
 /*
-* Test16: renameat(2) failure
-*/
+ * Test16: renameat(2) failure
+ */
 ATF_TC_WITH_CLEANUP(renameat_failure);
 ATF_TC_HEAD(renameat_failure, tc)
 {
@@ -431,8 +431,8 @@ ATF_TC_CLEANUP(renameat_failure, tc)
 
 
 /*
-* Test17: link(2) success
-*/
+ * Test17: link(2) success
+ */
 ATF_TC_WITH_CLEANUP(link_success);
 ATF_TC_HEAD(link_success, tc)
 {
@@ -455,8 +455,8 @@ ATF_TC_CLEANUP(link_success, tc)
 
 
 /*
-* Test18: link(2) failure
-*/
+ * Test18: link(2) failure
+ */
 ATF_TC_WITH_CLEANUP(link_failure);
 ATF_TC_HEAD(link_failure, tc)
 {
@@ -479,8 +479,8 @@ ATF_TC_CLEANUP(link_failure, tc)
 
 
 /*
-* Test19: linkat(2) success
-*/
+ * Test19: linkat(2) success
+ */
 ATF_TC_WITH_CLEANUP(linkat_success);
 ATF_TC_HEAD(linkat_success, tc)
 {
@@ -503,8 +503,8 @@ ATF_TC_CLEANUP(linkat_success, tc)
 
 
 /*
-* Test20: linkat(2) failure
-*/
+ * Test20: linkat(2) failure
+ */
 ATF_TC_WITH_CLEANUP(linkat_failure);
 ATF_TC_HEAD(linkat_failure, tc)
 {
@@ -527,8 +527,8 @@ ATF_TC_CLEANUP(linkat_failure, tc)
 
 
 /*
-* Test21: symlink(2) success
-*/
+ * Test21: symlink(2) success
+ */
 ATF_TC_WITH_CLEANUP(symlink_success);
 ATF_TC_HEAD(symlink_success, tc)
 {
@@ -550,8 +550,8 @@ ATF_TC_CLEANUP(symlink_success, tc)
 
 
 /*
-* Test22: symlink(2) failure
-*/
+ * Test22: symlink(2) failure
+ */
 ATF_TC_WITH_CLEANUP(symlink_failure);
 ATF_TC_HEAD(symlink_failure, tc)
 {
@@ -575,8 +575,8 @@ ATF_TC_CLEANUP(symlink_failure, tc)
 
 
 /*
-* Test23: symlinkat(2) success
-*/
+ * Test23: symlinkat(2) success
+ */
 ATF_TC_WITH_CLEANUP(symlinkat_success);
 ATF_TC_HEAD(symlinkat_success, tc)
 {
@@ -598,8 +598,8 @@ ATF_TC_CLEANUP(symlinkat_success, tc)
 
 
 /*
-* Test24: symlinkat(2) failure
-*/
+ * Test24: symlinkat(2) failure
+ */
 ATF_TC_WITH_CLEANUP(symlinkat_failure);
 ATF_TC_HEAD(symlinkat_failure, tc)
 {

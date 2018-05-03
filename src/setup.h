@@ -27,10 +27,10 @@
  */
 
 
-#include<poll.h>
-#include<stdio.h>
-#include<stdbool.h>
-#include<bsm/audit.h>
+#include <poll.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <bsm/audit.h>
 
 #ifndef _SETUP_H_
 #define _SETUP_H_
@@ -51,5 +51,3 @@ au_mask_t get_audit_class(const char *);
 FILE *setup(struct pollfd [], const char *);
 
 #endif  /* _SETUP_H_ */
-
-//TODO: some extern declarations

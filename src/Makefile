@@ -5,7 +5,7 @@ TESTSDIR=	${TESTSBASE}/sys/audit
 ATF_TESTS_C=	file-create
 
 SRCS.file-create=	file-create.c
-SRCS.file-create+=	setup.c
+SRCS.file-create+=	utils.c
 
 TEST_METADATA.file-create+= timeout="30"
 WARNS?=	6

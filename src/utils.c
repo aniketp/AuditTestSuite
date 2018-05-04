@@ -38,17 +38,22 @@
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
 
-#include "setup.h"
+#include "utils.h"
 
-bool
-get_records(const char *filepath, FILE *pipestream)
+/*
+ * Checks the presence of "auditregex" in auditpipe(4) after the
+ * corresponding system call has been triggered.
+ */
+static bool
+get_records(const char *auditregex, FILE *pipestream)
 {
-	u_char *buff;
+	uint8_t *buff;
 	tokenstr_t token;
-	ssize_t size = BUFFLEN;
+	ssize_t size = 1024;
 	char membuff[size];
 	char del[] = ",";
 	int reclen, bytesread = 0;
+	FILE *memstream;
 
 	/*
 	 * Open a stream on 'membuff' (address to memory buffer) for storing
@@ -56,7 +61,7 @@ get_records(const char *filepath, FILE *pipestream)
 	 * available records from auditpipe which is passed to the functions
 	 * au_fetch_tok(3) and au_print_flags_tok(3) for further use.
 	 */
-	FILE *memstream = fmemopen(membuff, size, "w");
+	memstream = fmemopen(membuff, size, "w");
 	reclen = au_read_rec(pipestream, &buff);
 
 	/*
@@ -76,15 +81,13 @@ get_records(const char *filepath, FILE *pipestream)
 
 	free(buff);
 	fclose(memstream);
-	return (atf_utils_grep_string("%s", membuff, filepath));
+	return (atf_utils_grep_string("%s", membuff, auditregex));
 }
 
 /*
- * Ensure that the auditpipe(4) does not depend on the universal
- * audit configuration at /etc/security/audit_control by setting
- * the flag mask as the corresponding audit_class of the event
+ * Override the system-wide audit mask settings in /etc/security/audit_control
  */
-void
+static void
 set_preselect_mode(int filedesc, au_mask_t *fmask)
 {
 	int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
@@ -106,20 +109,20 @@ set_preselect_mode(int filedesc, au_mask_t *fmask)
 }
 
 /*
- * Check if the auditd(8) startup was properly received at the auditpipe
+ * Check if the auditd(8) startup was properly received at the auditpipe(4)
  */
-void
+static void
 check_audit_startup(struct pollfd fd[], FILE *pipestream)
 {
 	int timeout = 2000;
-	const char *auditpath = (const char *)"audit startup";
+	const char *auditstring = "audit startup";
 
 	if (poll(fd, 1, timeout) < 0) {
 		atf_tc_fail("Poll: %s", strerror(errno));
 	} else {
 		if (fd[0].revents & POLLIN) {
 		/* We now have a proof that auditd(8) started smoothly */
-		ATF_REQUIRE(get_records(auditpath, pipestream));
+		ATF_REQUIRE(get_records(auditstring, pipestream));
 		} else {
 			/* revents is not POLLIN */
 			atf_tc_fail("Auditpipe returned an unknown event "
@@ -129,31 +132,48 @@ check_audit_startup(struct pollfd fd[], FILE *pipestream)
 }
 
 /*
+ * Get the corresponding audit_mask for class-name "name" then set the
+ * success and failure bits for fmask to be used as the ioctl argument
+ */
+static au_mask_t
+get_audit_mask(const char *name)
+{
+	au_mask_t fmask;
+	au_class_ent_t *class;
+
+	ATF_REQUIRE((class = getauclassnam(name)) != NULL);
+	fmask.am_success = class->ac_class;
+	fmask.am_failure = class->ac_class;
+	return (fmask);
+}
+
+/*
  * Loop until the auditpipe returns something, check if it is what
- * we want else repeat the procedure until ppoll(2) times out.
+ * we want, else repeat the procedure until ppoll(2) times out.
  */
 void
-check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream)
+check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 {
-	struct timespec curptr, endptr;
+	struct timespec currtime, endtime, timeout;
 
 	/* Set the expire time for poll(2) while waiting for syscall audit */
-	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endptr));
-	endptr.tv_sec += 5;
+	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endtime));
+	endtime.tv_sec += 5;
+	timeout.tv_nsec = endtime.tv_nsec;
 
 	while(true) {
         	/* Update the time left for auditpipe to return any event */
-	        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &curptr));
-		curptr.tv_sec = endptr.tv_sec - curptr.tv_sec;
+	        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &currtime));
+		timeout.tv_sec = endtime.tv_sec - currtime.tv_sec;
 
-		switch(ppoll(fd, 1, &curptr, NULL)) {
+		switch(ppoll(fd, 1, &timeout, NULL)) {
 			/* ppoll(2) returns, check if it's what we want */
 			case 1:
 				if (fd[0].revents & POLLIN) {
-					if (get_records(filepath, pipestream)) {
+					if (get_records(auditrgx, pipestream)) {
 					/* We have confirmed syscall's audit */
 						atf_tc_pass();
-                    			}
+					}
                 		} else {
                     			atf_tc_fail("Auditpipe returned an "
                                 	"unknown event %#x", fd[0].revents);
@@ -163,7 +183,7 @@ check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream)
 			/* poll(2) timed out */
 			case 0:
 				atf_tc_fail("Auditpipe did not return anything "
-						"within the time limit");
+					    "within the time limit");
 				break;
 
 			/* poll(2) standard error */
@@ -181,31 +201,16 @@ check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream)
 	close(fd[0].fd);
 }
 
-/*
- * Get the corresponding audit_class for class-name "name" then set the
- * success and failure bits for fmask to be used as the ioctl argument
- */
-au_mask_t
-get_audit_class(const char *name)
-{
-	au_mask_t fmask;
-	au_class_ent_t *class;
-
-	ATF_REQUIRE((class = getauclassnam(name)) != NULL);
-	fmask.am_success = class->ac_class;
-	fmask.am_failure = class->ac_class;
-	return (fmask);
-}
-
 FILE
 *setup(struct pollfd fd[], const char *name)
 {
 	au_mask_t fmask;
-	fmask = get_audit_class(name);
+	fmask = get_audit_mask(name);
+	FILE *pipestream;
 
 	fd[0].fd = open("/dev/auditpipe", O_RDONLY);
 	fd[0].events = POLLIN;
-	FILE *pipestream = fdopen(fd[0].fd, "r");
+	pipestream = fdopen(fd[0].fd, "r");
 
 	ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
 	{ service auditd onestart && touch started_auditd ; }"));
@@ -216,4 +221,11 @@ FILE
 	}
 	set_preselect_mode(fd[0].fd, &fmask);
 	return (pipestream);
+}
+
+void
+cleanup(void)
+{
+	system("[ -f started_auditd ] && service auditd onestop > \
+		/dev/null 2>&1");
 }

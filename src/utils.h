@@ -27,23 +27,16 @@
  */
 
 
+#ifndef _UTILS_H_
+#define _UTILS_H_
+
 #include <poll.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <bsm/audit.h>
 
-#ifndef _SETUP_H_
-#define _SETUP_H_
-
-#ifndef BUFFLEN
-#define BUFFLEN 1024
-#endif  /* BUFFLEN */
-
-bool get_records(const char *, FILE *);
-void set_preselect_mode(int, au_mask_t *);
-void check_audit_startup(struct pollfd [], FILE *);
 void check_audit(struct pollfd [], const char *, FILE *);
-au_mask_t get_audit_class(const char *);
 FILE *setup(struct pollfd [], const char *);
+void cleanup(void);
 
 #endif  /* _SETUP_H_ */

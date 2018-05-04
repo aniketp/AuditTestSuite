@@ -35,10 +35,6 @@
 #ifndef _SETUP_H_
 #define _SETUP_H_
 
-#ifndef ERROR
-#define ERROR (-1)
-#endif  /* ERROR */
-
 #ifndef BUFFLEN
 #define BUFFLEN 1024
 #endif  /* BUFFLEN */

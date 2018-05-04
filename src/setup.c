@@ -26,6 +26,7 @@
  * $FreeBSD$
  */
 
+#include <sys/ioctl.h>
 
 #include <time.h>
 #include <errno.h>
@@ -34,7 +35,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
 
@@ -43,29 +43,29 @@
 bool
 get_records(const char *filepath, FILE *pipestream)
 {
-    u_char *buff;
-    tokenstr_t token;
-    ssize_t size = BUFFLEN;
-    char membuff[size];
-    char del[] = ",";
-    int reclen, bytesread = 0;
+	u_char *buff;
+	tokenstr_t token;
+	ssize_t size = BUFFLEN;
+	char membuff[size];
+	char del[] = ",";
+	int reclen, bytesread = 0;
 
-    /*
-     * Open a stream on 'membuff' (address to memory buffer) for storing
-     * the audit records in the default mode.'reclen' is the length of the
-     * available records from auditpipe which is passed to the functions
-     * au_fetch_tok(3) and au_print_flags_tok(3) for further use.
-     */
-    FILE *memstream = fmemopen(membuff, size, "w");
-    reclen = au_read_rec(pipestream, &buff);
+	/*
+	 * Open a stream on 'membuff' (address to memory buffer) for storing
+	 * the audit records in the default mode.'reclen' is the length of the
+	 * available records from auditpipe which is passed to the functions
+	 * au_fetch_tok(3) and au_print_flags_tok(3) for further use.
+	 */
+	FILE *memstream = fmemopen(membuff, size, "w");
+	reclen = au_read_rec(pipestream, &buff);
 
-    /*
-     * Iterate through each BSM token, extracting the bits that are
-     * required to start processing the token sequences.
-     */
-    while (bytesread < reclen) {
+	/*
+	 * Iterate through each BSM token, extracting the bits that are
+	 * required to start processing the token sequences.
+	 */
+	while (bytesread < reclen) {
         if (au_fetch_tok(&token, buff + bytesread, \
-             reclen - bytesread) == ERROR) {
+             reclen - bytesread) == -1) {
             atf_tc_fail("Incomplete audit record");
         };
 
@@ -160,7 +160,7 @@ check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream) {
                 atf_tc_fail("Auditpipe did not return anything within "
                             "the time limit"); break;
             /* poll(2) standard error */
-            case ERROR:
+            case -1:
                 atf_tc_fail("Poll: %s", strerror(errno)); break;
 
             default:

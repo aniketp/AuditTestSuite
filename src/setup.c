@@ -65,17 +65,18 @@ get_records(const char *filepath, FILE *pipestream)
 	 */
 	while (bytesread < reclen) {
         if (au_fetch_tok(&token, buff + bytesread, \
-             reclen - bytesread) == -1) {
-            atf_tc_fail("Incomplete audit record");
+        		reclen - bytesread) == -1) {
+        	atf_tc_fail("Incomplete audit record");
         };
 
-    /* Print the tokens as they are obtained, in their default form */
-        au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
-        bytesread += token.len;
-    }
+	/* Print the tokens as they are obtained, in their default form */
+	au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
+	bytesread += token.len;
+	}
 
-    free(buff); fclose(memstream);
-    return atf_utils_grep_string("%s", membuff, filepath);
+	free(buff);
+	fclose(memstream);
+	return (atf_utils_grep_string("%s", membuff, filepath));
 }
 
 /*
@@ -84,45 +85,47 @@ get_records(const char *filepath, FILE *pipestream)
  * the flag mask as the corresponding audit_class of the event
  */
 void
-set_preselect_mode(int filedesc, au_mask_t *fmask) {
-    int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
+set_preselect_mode(int filedesc, au_mask_t *fmask)
+{
+	int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
 
-    /* Set local preselection mode for auditing */
-    if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &fmode) < 0) {
-        atf_tc_fail("Preselection mode: %s", strerror(errno));
-    }
+	/* Set local preselection mode for auditing */
+	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &fmode) < 0) {
+		atf_tc_fail("Preselection mode: %s", strerror(errno));
+	}
 
-    /* Set local preselection flag corresponding to the audit_event*/
-    if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_FLAGS, fmask) < 0) {
-        atf_tc_fail("Preselection flag: %s", strerror(errno));
-    }
+	/* Set local preselection flag corresponding to the audit_event*/
+	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_FLAGS, fmask) < 0) {
+		atf_tc_fail("Preselection flag: %s", strerror(errno));
+	}
 
-    /* This removes any outstanding record on the auditpipe */
-    if (ioctl(filedesc, AUDITPIPE_FLUSH) < 0) {
-        atf_tc_fail("Auditpipe flush: %s", strerror(errno));
-    }
+	/* This removes any outstanding record on the auditpipe */
+	if (ioctl(filedesc, AUDITPIPE_FLUSH) < 0) {
+		atf_tc_fail("Auditpipe flush: %s", strerror(errno));
+	}
 }
 
 /*
  * Check if the auditd(8) startup was properly received at the auditpipe
  */
 void
-check_audit_startup(struct pollfd fd[], FILE *pipestream) {
-    int timeout = 2000;
-    const char *auditpath = (const char *)"audit startup";
+check_audit_startup(struct pollfd fd[], FILE *pipestream)
+{
+	int timeout = 2000;
+	const char *auditpath = (const char *)"audit startup";
 
-    if (poll(fd, 1, timeout) < 0) {
-        atf_tc_fail("Poll: %s", strerror(errno));
-    } else {
-        if (fd[0].revents & POLLIN) {
-            /* We now have a proof that auditd(8) started smoothly */
-            ATF_REQUIRE(get_records(auditpath, pipestream));
-        } else {
-            /* revents is not POLLIN */
-            atf_tc_fail("Auditpipe returned an unknown event "
+	if (poll(fd, 1, timeout) < 0) {
+		atf_tc_fail("Poll: %s", strerror(errno));
+	} else {
+		if (fd[0].revents & POLLIN) {
+		/* We now have a proof that auditd(8) started smoothly */
+		ATF_REQUIRE(get_records(auditpath, pipestream));
+		} else {
+			/* revents is not POLLIN */
+			atf_tc_fail("Auditpipe returned an unknown event "
                         "%#x", fd[0].revents);
-        }
-    }
+		}
+	}
 }
 
 /*
@@ -130,47 +133,52 @@ check_audit_startup(struct pollfd fd[], FILE *pipestream) {
  * we want else repeat the procedure until ppoll(2) times out.
  */
 void
-check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream) {
-    struct timespec curptr, endptr;
+check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream)
+{
+	struct timespec curptr, endptr;
 
-    /* Set the expire time for poll(2) while waiting for syscall audit */
-    ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endptr));
-    endptr.tv_sec += 5;
+	/* Set the expire time for poll(2) while waiting for syscall audit */
+	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endptr));
+	endptr.tv_sec += 5;
 
-    while(true) {
-        /* Update the current time left for auditpipe to return any event */
-        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &curptr));
-        curptr.tv_sec = endptr.tv_sec - curptr.tv_sec;
+	while(true) {
+        	/* Update the time left for auditpipe to return any event */
+	        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &curptr));
+		curptr.tv_sec = endptr.tv_sec - curptr.tv_sec;
 
-        switch(ppoll(fd, 1, &curptr, NULL)) {
-            /* ppoll(2) returns an event, check if it's the event we want */
-            case 1:
-                if (fd[0].revents & POLLIN) {
-                    if (get_records(filepath, pipestream)) {
-                    /* We have confirmed syscall's audit */
-                        atf_tc_pass();
-                    }
-                } else {
-                    atf_tc_fail("Auditpipe returned an unknown event "
-                                "%#x", fd[0].revents);
-                } break;
+		switch(ppoll(fd, 1, &curptr, NULL)) {
+			/* ppoll(2) returns, check if it's what we want */
+			case 1:
+				if (fd[0].revents & POLLIN) {
+					if (get_records(filepath, pipestream)) {
+					/* We have confirmed syscall's audit */
+						atf_tc_pass();
+                    			}
+                		} else {
+                    			atf_tc_fail("Auditpipe returned an "
+                                	"unknown event %#x", fd[0].revents);
+				}
+				break;
 
-            /* poll(2) timed out */
-            case 0:
-                atf_tc_fail("Auditpipe did not return anything within "
-                            "the time limit"); break;
-            /* poll(2) standard error */
-            case -1:
-                atf_tc_fail("Poll: %s", strerror(errno)); break;
+			/* poll(2) timed out */
+			case 0:
+				atf_tc_fail("Auditpipe did not return anything "
+						"within the time limit");
+				break;
 
-            default:
-                atf_tc_fail("Poll returned an unknown event");
-        }
-    }
+			/* poll(2) standard error */
+			case -1:
+				atf_tc_fail("Poll: %s", strerror(errno));
+				break;
 
-    /* Cleanup */
-    fclose(pipestream);
-    close(fd[0].fd);
+			default:
+				atf_tc_fail("Poll returned an unknown event");
+		}
+	}
+
+	/* Cleanup */
+	fclose(pipestream);
+	close(fd[0].fd);
 }
 
 /*
@@ -178,32 +186,34 @@ check_audit(struct pollfd fd[], const char *filepath, FILE *pipestream) {
  * success and failure bits for fmask to be used as the ioctl argument
  */
 au_mask_t
-get_audit_class(const char *name) {
-    au_mask_t fmask;
-    au_class_ent_t *class;
+get_audit_class(const char *name)
+{
+	au_mask_t fmask;
+	au_class_ent_t *class;
 
-    ATF_REQUIRE((class = getauclassnam(name)) != NULL);
-    fmask.am_success = class->ac_class;
-    fmask.am_failure = class->ac_class;
-    return fmask;
+	ATF_REQUIRE((class = getauclassnam(name)) != NULL);
+	fmask.am_success = class->ac_class;
+	fmask.am_failure = class->ac_class;
+	return (fmask);
 }
 
 FILE
-*setup(struct pollfd fd[], const char *name) {
-    au_mask_t fmask;
-    fmask = get_audit_class(name);
+*setup(struct pollfd fd[], const char *name)
+{
+	au_mask_t fmask;
+	fmask = get_audit_class(name);
 
-    fd[0].fd = open("/dev/auditpipe", O_RDONLY);
-    fd[0].events = POLLIN;
-    FILE *pipestream = fdopen(fd[0].fd, "r");
+	fd[0].fd = open("/dev/auditpipe", O_RDONLY);
+	fd[0].events = POLLIN;
+	FILE *pipestream = fdopen(fd[0].fd, "r");
 
-    ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
-     { service auditd onestart && touch started_auditd ; }"));
+	ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
+	{ service auditd onestart && touch started_auditd ; }"));
 
-    /* If 'started_auditd' exists, that means we started auditd */
-    if (atf_utils_file_exists("started_auditd")) {
-        check_audit_startup(fd, pipestream);
-    }
-    set_preselect_mode(fd[0].fd, &fmask);
-    return pipestream;
+	/* If 'started_auditd' exists, that means we started auditd */
+	if (atf_utils_file_exists("started_auditd")) {
+		check_audit_startup(fd, pipestream);
+	}
+	set_preselect_mode(fd[0].fd, &fmask);
+	return (pipestream);
 }

@@ -48,8 +48,6 @@ ATF_TC_HEAD(mkdir_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"mkdir(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
-
 }
 
 ATF_TC_BODY(mkdir_success, tc)
@@ -70,7 +68,6 @@ ATF_TC_HEAD(mkdir_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"mkdir(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkdir_failure, tc)
@@ -93,7 +90,6 @@ ATF_TC_HEAD(mkdirat_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"mkdirat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkdirat_success, tc)
@@ -114,7 +110,6 @@ ATF_TC_HEAD(mkdirat_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"mkdirat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkdirat_failure, tc)
@@ -137,7 +132,6 @@ ATF_TC_HEAD(mkfifo_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"mkfifo(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkfifo_success, tc)
@@ -158,7 +152,6 @@ ATF_TC_HEAD(mkfifo_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"mkfifo(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkfifo_failure, tc)
@@ -181,7 +174,6 @@ ATF_TC_HEAD(mkfifoat_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"mkfifoat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkfifoat_success, tc)
@@ -202,7 +194,6 @@ ATF_TC_HEAD(mkfifoat_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"mkfifoat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mkfifoat_failure, tc)
@@ -225,7 +216,6 @@ ATF_TC_HEAD(mknod_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"mknod(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknod_success, tc)
@@ -246,7 +236,6 @@ ATF_TC_HEAD(mknod_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"mknod(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknod_failure, tc)
@@ -269,7 +258,6 @@ ATF_TC_HEAD(mknodat_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"mknodat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknodat_success, tc)
@@ -290,7 +278,6 @@ ATF_TC_HEAD(mknodat_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"mknodat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(mknodat_failure, tc)
@@ -313,7 +300,6 @@ ATF_TC_HEAD(rename_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"rename(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(rename_success, tc)
@@ -335,7 +321,6 @@ ATF_TC_HEAD(rename_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"rename(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(rename_failure, tc)
@@ -357,7 +342,6 @@ ATF_TC_HEAD(renameat_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"renameat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(renameat_success, tc)
@@ -379,7 +363,6 @@ ATF_TC_HEAD(renameat_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"renameat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(renameat_failure, tc)
@@ -401,7 +384,6 @@ ATF_TC_HEAD(link_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"link(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(link_success, tc)
@@ -423,7 +405,6 @@ ATF_TC_HEAD(link_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"link(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(link_failure, tc)
@@ -445,7 +426,6 @@ ATF_TC_HEAD(linkat_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"linkat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(linkat_success, tc)
@@ -467,7 +447,6 @@ ATF_TC_HEAD(linkat_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"linkat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(linkat_failure, tc)
@@ -489,7 +468,6 @@ ATF_TC_HEAD(symlink_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"symlink(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(symlink_success, tc)
@@ -510,7 +488,6 @@ ATF_TC_HEAD(symlink_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"symlink(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(symlink_failure, tc)
@@ -533,7 +510,6 @@ ATF_TC_HEAD(symlinkat_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
 					"symlinkat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(symlinkat_success, tc)
@@ -554,7 +530,6 @@ ATF_TC_HEAD(symlinkat_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
 					"symlinkat(2) call");
-	atf_tc_set_md_var(tc, "require.user", "root");
 }
 
 ATF_TC_BODY(symlinkat_failure, tc)

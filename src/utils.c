@@ -69,10 +69,10 @@ get_records(const char *auditregex, FILE *pipestream)
 	 * required to start processing the token sequences.
 	 */
 	while (bytesread < reclen) {
-        if (au_fetch_tok(&token, buff + bytesread, \
-        		reclen - bytesread) == -1) {
-        	atf_tc_fail("Incomplete audit record");
-        };
+		if (au_fetch_tok(&token, buff + bytesread, \
+				reclen - bytesread) == -1) {
+			atf_tc_fail("Incomplete audit record");
+		};
 
 	/* Print the tokens as they are obtained, in their default form */
 	au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
@@ -121,12 +121,12 @@ check_audit_startup(struct pollfd fd[], FILE *pipestream)
 		atf_tc_fail("Poll: %s", strerror(errno));
 	} else {
 		if (fd[0].revents & POLLIN) {
-		/* We now have a proof that auditd(8) started smoothly */
-		ATF_REQUIRE(get_records(auditstring, pipestream));
+			/* We now have a proof that auditd started smoothly */
+			ATF_REQUIRE(get_records(auditstring, pipestream));
 		} else {
 			/* revents is not POLLIN */
-			atf_tc_fail("Auditpipe returned an unknown event "
-                        "%#x", fd[0].revents);
+			atf_tc_fail("Auditpipe returned an unknown event %#x",
+				fd[0].revents);
 		}
 	}
 }
@@ -162,7 +162,7 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 	timeout.tv_nsec = endtime.tv_nsec;
 
 	while(true) {
-        	/* Update the time left for auditpipe to return any event */
+		/* Update the time left for auditpipe to return any event */
 	        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &currtime));
 		timeout.tv_sec = endtime.tv_sec - currtime.tv_sec;
 
@@ -171,19 +171,19 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 			case 1:
 				if (fd[0].revents & POLLIN) {
 					if (get_records(auditrgx, pipestream)) {
-					/* We have confirmed syscall's audit */
+						/* Syscall's audit is confirmed */
 						atf_tc_pass();
 					}
                 		} else {
-                    			atf_tc_fail("Auditpipe returned an "
-                                	"unknown event %#x", fd[0].revents);
-				}
+					atf_tc_fail("Auditpipe returned an "
+					"unknown event %#x", fd[0].revents);
+                                }
 				break;
 
 			/* poll(2) timed out */
 			case 0:
 				atf_tc_fail("Auditpipe did not return anything "
-					    "within the time limit");
+						"within the time limit");
 				break;
 
 			/* poll(2) standard error */

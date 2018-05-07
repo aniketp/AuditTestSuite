@@ -28,10 +28,12 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "utils.h"
 
@@ -39,8 +41,513 @@ static struct pollfd fds[1];
 static mode_t mode = 0777;
 static dev_t dev =  0;
 static const char *path = "fileforaudit";
+static const char *errpath = "temp/fileforaudit";
 static const char *successreg = "fileforaudit.*return,success";
 static const char *failurereg = "fileforaudit.*return,failure";
+
+
+ATF_TC_WITH_CLEANUP(open_read_creat_success);
+ATF_TC_HEAD(open_read_creat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful open(2)"
+					" call for O_RDONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(open_read_creat_success, tc)
+{
+	const char *regex = "read,creat.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(syscall(SYS_open, path, O_RDONLY | O_CREAT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_creat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_creat_failure);
+ATF_TC_HEAD(open_read_creat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful open(2)"
+					" call for O_RDONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(open_read_creat_failure, tc)
+{
+	const char *regex = "read,creat.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, syscall(SYS_open, errpath, O_RDONLY | O_CREAT));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_creat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_creat_success);
+ATF_TC_HEAD(openat_read_creat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of successful openat(2)"
+					" call for O_RDONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(openat_read_creat_success, tc)
+{
+	const char *regex = "read,creat.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(openat(AT_FDCWD, path, O_RDONLY | O_CREAT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_creat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_creat_failure);
+ATF_TC_HEAD(openat_read_creat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful openat(2)"
+					" call for O_RDONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(openat_read_creat_failure, tc)
+{
+	const char *regex = "read,creat.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, openat(AT_FDCWD, errpath, O_RDONLY | O_CREAT));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_creat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_creat_trunc_success);
+ATF_TC_HEAD(open_read_creat_trunc_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful open(2)"
+				" call for O_RDONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(open_read_creat_trunc_success, tc)
+{
+	const char *regex = "read,creat,trunc.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(syscall(SYS_open, path, O_RDONLY | O_CREAT | O_TRUNC) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_creat_trunc_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_creat_trunc_failure);
+ATF_TC_HEAD(open_read_creat_trunc_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful open(2)"
+				" call for O_RDONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(open_read_creat_trunc_failure, tc)
+{
+	const char *regex = "read,creat,trunc.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, syscall(SYS_open, errpath, O_RDONLY | O_CREAT | O_TRUNC));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_creat_trunc_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_creat_trunc_success);
+ATF_TC_HEAD(openat_read_creat_trunc_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of successful openat(2)"
+				" call for O_RDONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(openat_read_creat_trunc_success, tc)
+{
+	const char *regex = "read,creat,trunc.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(openat(AT_FDCWD, path, O_RDONLY | O_CREAT | O_TRUNC) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_creat_trunc_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_creat_trunc_failure);
+ATF_TC_HEAD(openat_read_creat_trunc_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful openat(2)"
+				" call for O_RDONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(openat_read_creat_trunc_failure, tc)
+{
+	const char *regex = "read,creat,trunc.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, openat(AT_FDCWD, errpath, O_RDONLY | O_CREAT | O_TRUNC));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_creat_trunc_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_write_creat_success);
+ATF_TC_HEAD(open_write_creat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful open(2)"
+					" call for O_WRONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(open_write_creat_success, tc)
+{
+	const char *regex = "write,creat.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(syscall(SYS_open, path, O_WRONLY | O_CREAT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_write_creat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_write_creat_failure);
+ATF_TC_HEAD(open_write_creat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful open(2)"
+					" call for O_WRONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(open_write_creat_failure, tc)
+{
+	const char *regex = "write,creat.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, syscall(SYS_open, errpath, O_WRONLY | O_CREAT));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_write_creat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_write_creat_success);
+ATF_TC_HEAD(openat_write_creat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of successful openat(2)"
+					" call for O_WRONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(openat_write_creat_success, tc)
+{
+	const char *regex = "write,creat.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(openat(AT_FDCWD, path, O_WRONLY | O_CREAT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_write_creat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_write_creat_failure);
+ATF_TC_HEAD(openat_write_creat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful openat(2)"
+					" call for O_WRONLY, O_CREAT flags");
+}
+
+ATF_TC_BODY(openat_write_creat_failure, tc)
+{
+	const char *regex = "write,creat.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, openat(AT_FDCWD, errpath, O_WRONLY | O_CREAT));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_write_creat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_write_creat_trunc_success);
+ATF_TC_HEAD(open_write_creat_trunc_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful open(2)"
+				" call for O_WRONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(open_write_creat_trunc_success, tc)
+{
+	const char *regex = "write,creat,trunc.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(syscall(SYS_open, path, O_WRONLY | O_CREAT | O_TRUNC) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_write_creat_trunc_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_write_creat_trunc_failure);
+ATF_TC_HEAD(open_write_creat_trunc_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful open(2)"
+				" call for O_WRONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(open_write_creat_trunc_failure, tc)
+{
+	const char *regex = "write,creat,trunc.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, syscall(SYS_open, errpath, O_WRONLY | O_CREAT | O_TRUNC));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_write_creat_trunc_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_write_creat_trunc_success);
+ATF_TC_HEAD(openat_write_creat_trunc_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of successful openat(2)"
+				" call for O_WRONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(openat_write_creat_trunc_success, tc)
+{
+	const char *regex = "write,creat,trunc.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(openat(AT_FDCWD, path, O_WRONLY | O_CREAT | O_TRUNC) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_write_creat_trunc_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_write_creat_trunc_failure);
+ATF_TC_HEAD(openat_write_creat_trunc_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful openat(2)"
+				" call for O_WRONLY, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(openat_write_creat_trunc_failure, tc)
+{
+	const char *regex = "write,creat,trunc.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, openat(AT_FDCWD, errpath, O_WRONLY | O_CREAT | O_TRUNC));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_write_creat_trunc_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_write_creat_success);
+ATF_TC_HEAD(open_read_write_creat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful open(2)"
+					" call for O_RDWR, O_CREAT flags");
+}
+
+ATF_TC_BODY(open_read_write_creat_success, tc)
+{
+	const char *regex = "read,write,creat.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(syscall(SYS_open, path, O_RDWR | O_CREAT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_write_creat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_write_creat_failure);
+ATF_TC_HEAD(open_read_write_creat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful open(2)"
+					" call for O_RDWR, O_CREAT flags");
+}
+
+ATF_TC_BODY(open_read_write_creat_failure, tc)
+{
+	const char *regex = "read,write,creat.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, syscall(SYS_open, errpath, O_RDWR | O_CREAT));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_write_creat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_write_creat_success);
+ATF_TC_HEAD(openat_read_write_creat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of successful openat(2)"
+					" call for O_RDWR, O_CREAT flags");
+}
+
+ATF_TC_BODY(openat_read_write_creat_success, tc)
+{
+	const char *regex = "read,write,creat.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(openat(AT_FDCWD, path, O_RDWR | O_CREAT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_write_creat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_write_creat_failure);
+ATF_TC_HEAD(openat_read_write_creat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful openat(2)"
+					" call for O_RDWR, O_CREAT flags");
+}
+
+ATF_TC_BODY(openat_read_write_creat_failure, tc)
+{
+	const char *regex = "read,write,creat.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, openat(AT_FDCWD, errpath, O_RDWR | O_CREAT));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_write_creat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_write_creat_trunc_success);
+ATF_TC_HEAD(open_read_write_creat_trunc_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful open(2)"
+				" call for O_RDWR, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(open_read_write_creat_trunc_success, tc)
+{
+	const char *regex = "read,write,creat,trunc.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(syscall(SYS_open, path, O_RDWR | O_CREAT | O_TRUNC) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_write_creat_trunc_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(open_read_write_creat_trunc_failure);
+ATF_TC_HEAD(open_read_write_creat_trunc_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful open(2)"
+				" call for O_RDWR, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(open_read_write_creat_trunc_failure, tc)
+{
+	const char *regex = "read,write,creat,trunc.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, syscall(SYS_open, errpath, O_RDWR | O_CREAT | O_TRUNC));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(open_read_write_creat_trunc_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_write_creat_trunc_success);
+ATF_TC_HEAD(openat_read_write_creat_trunc_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of successful openat(2)"
+				" call for O_RDWR, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(openat_read_write_creat_trunc_success, tc)
+{
+	const char *regex = "read,write,creat,trunc.*fileforaudit.*return,success";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE(openat(AT_FDCWD, path, O_RDWR | O_CREAT | O_TRUNC) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_write_creat_trunc_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(openat_read_write_creat_trunc_failure);
+ATF_TC_HEAD(openat_read_write_creat_trunc_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of unsuccessful openat(2)"
+				" call for O_RDWR, O_CREAT, O_TRUNC flags");
+}
+
+ATF_TC_BODY(openat_read_write_creat_trunc_failure, tc)
+{
+	const char *regex = "read,write,creat,trunc.*fileforaudit.*return,failure";
+	FILE *pipefd = setup(fds, "fc");
+	ATF_REQUIRE_EQ(-1, openat(AT_FDCWD, errpath, O_RDWR | O_CREAT | O_TRUNC));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(openat_read_write_creat_trunc_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(mkdir_success);
@@ -549,6 +1056,7 @@ ATF_TC_CLEANUP(symlinkat_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+
 	ATF_TP_ADD_TC(tp, mkdir_success);
 	ATF_TP_ADD_TC(tp, mkdir_failure);
 	ATF_TP_ADD_TC(tp, mkdirat_success);
@@ -578,6 +1086,36 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, symlink_failure);
 	ATF_TP_ADD_TC(tp, symlinkat_success);
 	ATF_TP_ADD_TC(tp, symlinkat_failure);
+
+	ATF_TP_ADD_TC(tp, open_read_creat_success);
+	ATF_TP_ADD_TC(tp, open_read_creat_failure);
+	ATF_TP_ADD_TC(tp, openat_read_creat_success);
+	ATF_TP_ADD_TC(tp, openat_read_creat_failure);
+
+	ATF_TP_ADD_TC(tp, open_read_creat_trunc_success);
+	ATF_TP_ADD_TC(tp, open_read_creat_trunc_failure);
+	ATF_TP_ADD_TC(tp, openat_read_creat_trunc_success);
+	ATF_TP_ADD_TC(tp, openat_read_creat_trunc_failure);
+
+	ATF_TP_ADD_TC(tp, open_write_creat_success);
+	ATF_TP_ADD_TC(tp, open_write_creat_failure);
+	ATF_TP_ADD_TC(tp, openat_write_creat_success);
+	ATF_TP_ADD_TC(tp, openat_write_creat_failure);
+
+	ATF_TP_ADD_TC(tp, open_write_creat_trunc_success);
+	ATF_TP_ADD_TC(tp, open_write_creat_trunc_failure);
+	ATF_TP_ADD_TC(tp, openat_write_creat_trunc_success);
+	ATF_TP_ADD_TC(tp, openat_write_creat_trunc_failure);
+
+	ATF_TP_ADD_TC(tp, open_read_write_creat_success);
+	ATF_TP_ADD_TC(tp, open_read_write_creat_failure);
+	ATF_TP_ADD_TC(tp, openat_read_write_creat_success);
+	ATF_TP_ADD_TC(tp, openat_read_write_creat_failure);
+
+	ATF_TP_ADD_TC(tp, open_read_write_creat_trunc_success);
+	ATF_TP_ADD_TC(tp, open_read_write_creat_trunc_failure);
+	ATF_TP_ADD_TC(tp, openat_read_write_creat_trunc_success);
+	ATF_TP_ADD_TC(tp, openat_read_write_creat_trunc_failure);
 
 	return (atf_no_error());
 }

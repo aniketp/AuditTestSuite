@@ -4,7 +4,6 @@
 #include<fcntl.h>
 #include<sys/syscall.h>
 
-#define BUFFLEN 1024
 #define ERROR (-1)
 
 void main(){

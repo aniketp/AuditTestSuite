@@ -56,7 +56,6 @@ ATF_TC_BODY(readlink_success, tc)
 {
 	memset(buff, 0, sizeof(buff));
 	ATF_REQUIRE_EQ(0, symlink("symlink", path));
-
 	FILE *pipefd = setup(fds, "fr");
 	ATF_REQUIRE(readlink(path, buff, sizeof(buff)-1) != -1);
 	check_audit(fds, successreg, pipefd);
@@ -101,7 +100,6 @@ ATF_TC_BODY(readlinkat_success, tc)
 {
 	memset(buff, 0, sizeof(buff));
 	ATF_REQUIRE_EQ(0, symlink("symlink", path));
-
 	FILE *pipefd = setup(fds, "fr");
 	ATF_REQUIRE(readlinkat(AT_FDCWD, path, buff, sizeof(buff)-1) != -1);
 	check_audit(fds, successreg, pipefd);

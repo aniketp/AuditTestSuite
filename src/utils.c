@@ -52,7 +52,7 @@ get_records(const char *auditregex, FILE *pipestream)
 	ssize_t size = 1024;
 	char membuff[size];
 	char del[] = ",";
-	int reclen, bytesread = 0;
+	int reclen, bytes = 0;
 	FILE *memstream;
 
 	/*
@@ -68,15 +68,13 @@ get_records(const char *auditregex, FILE *pipestream)
 	 * Iterate through each BSM token, extracting the bits that are
 	 * required to start processing the token sequences.
 	 */
-	while (bytesread < reclen) {
-		if (au_fetch_tok(&token, buff + bytesread, \
-				reclen - bytesread) == -1) {
+	while (bytes < reclen) {
+		if (au_fetch_tok(&token, buff + bytes, reclen - bytes) == -1) {
 			atf_tc_fail("Incomplete audit record");
 		};
-
-	/* Print the tokens as they are obtained, in their default form */
-	au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
-	bytesread += token.len;
+		/* Print the tokens as they are obtained, in the default form */
+		au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
+		bytes += token.len;
 	}
 
 	free(buff);
@@ -93,19 +91,20 @@ set_preselect_mode(int filedesc, au_mask_t *fmask)
 	int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
 
 	/* Set local preselection mode for auditing */
-	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &fmode) < 0) {
+	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &fmode) < 0)
 		atf_tc_fail("Preselection mode: %s", strerror(errno));
-	}
 
-	/* Set local preselection flag corresponding to the audit_event*/
-	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_FLAGS, fmask) < 0) {
+	/* Set local preselection flag corresponding to the audit_event */
+	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_FLAGS, fmask) < 0)
 		atf_tc_fail("Preselection flag: %s", strerror(errno));
-	}
+
+	/* Set local preselection flag for non-attributable audit_events */
+	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_NAFLAGS, fmask) < 0)
+		atf_tc_fail("Preselection flag: %s", strerror(errno));
 
 	/* This removes any outstanding record on the auditpipe */
-	if (ioctl(filedesc, AUDITPIPE_FLUSH) < 0) {
+	if (ioctl(filedesc, AUDITPIPE_FLUSH) < 0)
 		atf_tc_fail("Auditpipe flush: %s", strerror(errno));
-	}
 }
 
 /*
@@ -161,12 +160,12 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 	endtime.tv_sec += 5;
 	timeout.tv_nsec = endtime.tv_nsec;
 
-	while(true) {
+	while (true) {
 		/* Update the time left for auditpipe to return any event */
-	        ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &currtime));
+		ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &currtime));
 		timeout.tv_sec = endtime.tv_sec - currtime.tv_sec;
 
-		switch(ppoll(fd, 1, &timeout, NULL)) {
+		switch (ppoll(fd, 1, &timeout, NULL)) {
 			/* ppoll(2) returns, check if it's what we want */
 			case 1:
 				if (fd[0].revents & POLLIN) {
@@ -174,10 +173,10 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 						/* Syscall's audit is confirmed */
 						atf_tc_pass();
 					}
-                		} else {
+				} else {
 					atf_tc_fail("Auditpipe returned an "
 					"unknown event %#x", fd[0].revents);
-                                }
+				}
 				break;
 
 			/* poll(2) timed out */
@@ -216,9 +215,9 @@ FILE
 	{ service auditd onestart && touch started_auditd ; }"));
 
 	/* If 'started_auditd' exists, that means we started auditd */
-	if (atf_utils_file_exists("started_auditd")) {
+	if (atf_utils_file_exists("started_auditd"))
 		check_audit_startup(fd, pipestream);
-	}
+
 	set_preselect_mode(fd[0].fd, &fmask);
 	return (pipestream);
 }

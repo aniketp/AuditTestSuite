@@ -143,6 +143,10 @@ get_audit_mask(const char *name)
 	ATF_REQUIRE((class = getauclassnam(name)) != NULL);
 	fmask.am_success = class->ac_class;
 	fmask.am_failure = class->ac_class;
+	ATF_REQUIRE((class = getauclassnam("ad")) != NULL);
+	fmask.am_success |= class->ac_class;
+	fmask.am_failure |= class->ac_class;
+
 	return (fmask);
 }
 
@@ -214,11 +218,11 @@ FILE
 	ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
 	{ service auditd onestart && touch started_auditd ; }"));
 
+	set_preselect_mode(fd[0].fd, &fmask);
 	/* If 'started_auditd' exists, that means we started auditd */
 	if (atf_utils_file_exists("started_auditd"))
 		check_audit_startup(fd, pipestream);
 
-	set_preselect_mode(fd[0].fd, &fmask);
 	return (pipestream);
 }
 

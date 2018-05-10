@@ -108,29 +108,6 @@ set_preselect_mode(int filedesc, au_mask_t *fmask)
 }
 
 /*
- * Check if the auditd(8) startup was properly received at the auditpipe(4)
- */
-static void
-check_audit_startup(struct pollfd fd[], FILE *pipestream)
-{
-	int timeout = 2000;
-	const char *auditstring = "audit startup";
-
-	if (poll(fd, 1, timeout) < 0) {
-		atf_tc_fail("Poll: %s", strerror(errno));
-	} else {
-		if (fd[0].revents & POLLIN) {
-			/* We now have a proof that auditd started smoothly */
-			ATF_REQUIRE(get_records(auditstring, pipestream));
-		} else {
-			/* revents is not POLLIN */
-			atf_tc_fail("Auditpipe returned an unknown event %#x",
-				fd[0].revents);
-		}
-	}
-}
-
-/*
  * Get the corresponding audit_mask for class-name "name" then set the
  * success and failure bits for fmask to be used as the ioctl argument
  */
@@ -145,7 +122,6 @@ get_audit_mask(const char *name)
 	fmask.am_failure = class->ac_class;
 	ATF_REQUIRE((class = getauclassnam("ad")) != NULL);
 	fmask.am_success |= class->ac_class;
-	fmask.am_failure |= class->ac_class;
 
 	return (fmask);
 }
@@ -154,8 +130,8 @@ get_audit_mask(const char *name)
  * Loop until the auditpipe returns something, check if it is what
  * we want, else repeat the procedure until ppoll(2) times out.
  */
-void
-check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
+static void
+check_auditpipe(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 {
 	struct timespec currtime, endtime, timeout;
 
@@ -164,7 +140,7 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 	endtime.tv_sec += 5;
 	timeout.tv_nsec = endtime.tv_nsec;
 
-	while (true) {
+	for (;;) {
 		/* Update the time left for auditpipe to return any event */
 		ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &currtime));
 		timeout.tv_sec = endtime.tv_sec - currtime.tv_sec;
@@ -174,8 +150,7 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 			case 1:
 				if (fd[0].revents & POLLIN) {
 					if (get_records(auditrgx, pipestream)) {
-						/* Syscall's audit is confirmed */
-						atf_tc_pass();
+						return;
 					}
 				} else {
 					atf_tc_fail("Auditpipe returned an "
@@ -198,11 +173,25 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream)
 				atf_tc_fail("Poll returned an unknown event");
 		}
 	}
+}
+
+/*
+ * Wrapper functions around static "check_auditpipe"
+ */
+static void
+check_audit_startup(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
+	check_auditpipe(fd, auditrgx, pipestream);
+}
+
+void
+check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
+	check_auditpipe(fd, auditrgx, pipestream);
 
 	/* Cleanup */
 	fclose(pipestream);
 	close(fd[0].fd);
 }
+
 
 FILE
 *setup(struct pollfd fd[], const char *name)
@@ -217,11 +206,11 @@ FILE
 
 	ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
 	{ service auditd onestart && touch started_auditd ; }"));
-
 	set_preselect_mode(fd[0].fd, &fmask);
+
 	/* If 'started_auditd' exists, that means we started auditd */
 	if (atf_utils_file_exists("started_auditd"))
-		check_audit_startup(fd, pipestream);
+		check_audit_startup(fd, "audit startup", pipestream);
 
 	return (pipestream);
 }

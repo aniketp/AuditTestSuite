@@ -26,6 +26,7 @@
  * $FreeBSD$
  */
 
+#include <sys/stat.h>
 #include <sys/syscall.h>
 
 #include <atf-c.h>
@@ -38,6 +39,218 @@ static struct pollfd fds[1];
 static mode_t mode = 0777;
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
+static const char *successreg = "fileforaudit.*return,success";
+static const char *failurereg = "fileforaudit.*return,failure";
+
+
+ATF_TC_WITH_CLEANUP(rmdir_success);
+ATF_TC_HEAD(rmdir_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"rmdir(2) call");
+}
+
+ATF_TC_BODY(rmdir_success, tc)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, mode));
+	FILE *pipefd = setup(fds, "fd");
+	ATF_REQUIRE_EQ(0, rmdir(path));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(rmdir_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(rmdir_failure);
+ATF_TC_HEAD(rmdir_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"rmdir(2) call");
+}
+
+ATF_TC_BODY(rmdir_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fd");
+	/* Failure reason: directory does not exist */
+	ATF_REQUIRE_EQ(-1, rmdir(errpath));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(rmdir_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(rename_success);
+ATF_TC_HEAD(rename_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"rename(2) call");
+}
+
+ATF_TC_BODY(rename_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fd");
+	ATF_REQUIRE_EQ(0, rename(path, "renamed"));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(rename_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(rename_failure);
+ATF_TC_HEAD(rename_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"rename(2) call");
+}
+
+ATF_TC_BODY(rename_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fd");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, rename(path, "renamed"));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(rename_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(renameat_success);
+ATF_TC_HEAD(renameat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"renameat(2) call");
+}
+
+ATF_TC_BODY(renameat_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fd");
+	ATF_REQUIRE_EQ(0, renameat(AT_FDCWD, path, AT_FDCWD, "renamed"));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(renameat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(renameat_failure);
+ATF_TC_HEAD(renameat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"renameat(2) call");
+}
+
+ATF_TC_BODY(renameat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fd");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, renameat(AT_FDCWD, path, AT_FDCWD, "renamed"));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(renameat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(unlink_success);
+ATF_TC_HEAD(unlink_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"unlink(2) call");
+}
+
+ATF_TC_BODY(unlink_success, tc)
+{
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fd");
+	ATF_REQUIRE_EQ(0, unlink(path));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(unlink_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(unlink_failure);
+ATF_TC_HEAD(unlink_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"unlink(2) call");
+}
+
+ATF_TC_BODY(unlink_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fd");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, unlink(errpath));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(unlink_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(unlinkat_success);
+ATF_TC_HEAD(unlinkat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"unlinkat(2) call");
+}
+
+ATF_TC_BODY(unlinkat_success, tc)
+{
+	ATF_REQUIRE_EQ(0, mkdir(path, mode));
+	FILE *pipefd = setup(fds, "fd");
+	ATF_REQUIRE_EQ(0, unlinkat(AT_FDCWD, path, AT_REMOVEDIR));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(unlinkat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(unlinkat_failure);
+ATF_TC_HEAD(unlinkat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"unlinkat(2) call");
+}
+
+ATF_TC_BODY(unlinkat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fd");
+	/* Failure reason: directory does not exist */
+	ATF_REQUIRE_EQ(-1, unlinkat(AT_FDCWD, errpath, AT_REMOVEDIR));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(unlinkat_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(open_read_trunc_success);
@@ -558,6 +771,18 @@ ATF_TC_CLEANUP(openat_read_write_creat_trunc_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, rmdir_success);
+	ATF_TP_ADD_TC(tp, rmdir_failure);
+
+	ATF_TP_ADD_TC(tp, rename_success);
+	ATF_TP_ADD_TC(tp, rename_failure);
+	ATF_TP_ADD_TC(tp, renameat_success);
+	ATF_TP_ADD_TC(tp, renameat_failure);
+
+	ATF_TP_ADD_TC(tp, unlink_success);
+	ATF_TP_ADD_TC(tp, unlink_failure);
+	ATF_TP_ADD_TC(tp, unlinkat_success);
+	ATF_TP_ADD_TC(tp, unlinkat_failure);
 
 	ATF_TP_ADD_TC(tp, open_read_trunc_success);
 	ATF_TP_ADD_TC(tp, open_read_trunc_failure);

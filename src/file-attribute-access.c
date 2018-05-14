@@ -38,6 +38,137 @@ static struct pollfd fds[1];
 static mode_t mode = 0777;
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
+static const char *successreg = "fileforaudit.*return,success";
+static const char *failurereg = "fileforaudit.*return,failure";
+
+
+ATF_TC_WITH_CLEANUP(access_success);
+ATF_TC_HEAD(access_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"access(2) call");
+}
+
+ATF_TC_BODY(access_success, tc)
+{
+	/* File needs to exist to call access(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, access(path, F_OK));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(access_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(access_failure);
+ATF_TC_HEAD(access_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"access(2) call");
+}
+
+ATF_TC_BODY(access_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, access(errpath, F_OK));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(access_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(eaccess_success);
+ATF_TC_HEAD(eaccess_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"eaccess(2) call");
+}
+
+ATF_TC_BODY(eaccess_success, tc)
+{
+	/* File needs to exist to call eaccess(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, eaccess(path, F_OK));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(eaccess_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(eaccess_failure);
+ATF_TC_HEAD(eaccess_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"eaccess(2) call");
+}
+
+ATF_TC_BODY(eaccess_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, eaccess(errpath, F_OK));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(eaccess_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(faccessat_success);
+ATF_TC_HEAD(faccessat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"faccessat(2) call");
+}
+
+ATF_TC_BODY(faccessat_success, tc)
+{
+	/* File needs to exist to call faccessat(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, faccessat(AT_FDCWD, path, F_OK, AT_EACCESS));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(faccessat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(faccessat_failure);
+ATF_TC_HEAD(faccessat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"faccessat(2) call");
+}
+
+ATF_TC_BODY(faccessat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, faccessat(AT_FDCWD, errpath, F_OK, AT_EACCESS));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(faccessat_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(open_read_creat_success);
@@ -810,6 +941,13 @@ ATF_TC_CLEANUP(openat_read_write_creat_trunc_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, access_success);
+	ATF_TP_ADD_TC(tp, access_failure);
+	ATF_TP_ADD_TC(tp, eaccess_success);
+	ATF_TP_ADD_TC(tp, eaccess_failure);
+	ATF_TP_ADD_TC(tp, faccessat_success);
+	ATF_TP_ADD_TC(tp, faccessat_failure);
+
 	ATF_TP_ADD_TC(tp, open_read_creat_success);
 	ATF_TP_ADD_TC(tp, open_read_creat_failure);
 	ATF_TP_ADD_TC(tp, openat_read_creat_success);

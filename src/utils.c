@@ -156,8 +156,8 @@ check_auditpipe(struct pollfd fd[], const char *auditregex, FILE *pipestream)
 
 		/* poll(2) timed out */
 		case 0:
-			atf_tc_fail("Auditpipe did not return anything "
-					"within the time limit");
+			atf_tc_fail("%s not found in auditpipe within the "
+					"time limit", auditregex);
 			break;
 
 		/* poll(2) standard error */

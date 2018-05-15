@@ -27,6 +27,8 @@
  */
 
 #include <sys/stat.h>
+#include <sys/param.h>
+#include <sys/mount.h>
 #include <sys/syscall.h>
 
 #include <atf-c.h>
@@ -41,6 +43,7 @@ static struct pollfd fds[1];
 
 static mode_t mode = 0777;
 static struct stat statbuff;
+static struct statfs statfsbuff;
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
 static const char *successreg = "fileforaudit.*return,success";
@@ -222,6 +225,100 @@ ATF_TC_BODY(fstatat_failure, tc)
 }
 
 ATF_TC_CLEANUP(fstatat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(statfs_success);
+ATF_TC_HEAD(statfs_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"statfs(2) call");
+}
+
+ATF_TC_BODY(statfs_success, tc)
+{
+	/* File needs to exist to call statfs(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, statfs(path, &statfsbuff));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(statfs_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(statfs_failure);
+ATF_TC_HEAD(statfs_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"statfs(2) call");
+}
+
+ATF_TC_BODY(statfs_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, statfs(errpath, &statfsbuff));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(statfs_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fstatfs_success);
+ATF_TC_HEAD(fstatfs_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fstatfs(2) call");
+}
+
+ATF_TC_BODY(fstatfs_success, tc)
+{
+	int filedesc;
+	char regex[30];
+
+	/* File needs to exist to call fstat(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
+	/* Call stat(2) to store the Inode number of 'path' */
+	ATF_REQUIRE_EQ(0, stat(path, &statbuff));
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, fstatfs(filedesc, &statfsbuff));
+
+	snprintf(regex, 30, "fstatfs.*%u.*return,success", statbuff.st_ino);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fstatfs_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fstatfs_failure);
+ATF_TC_HEAD(fstatfs_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fstatfs(2) call");
+}
+
+ATF_TC_BODY(fstatfs_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	const char *regex = "fstatfs.*return,failure : Bad file descriptor";
+	/* Failure reason: bad file descriptor */
+	ATF_REQUIRE_EQ(-1, fstatfs(-1, &statfsbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fstatfs_failure, tc)
 {
 	cleanup();
 }
@@ -1134,6 +1231,11 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, fstat_failure);
 	ATF_TP_ADD_TC(tp, fstatat_success);
 	ATF_TP_ADD_TC(tp, fstatat_failure);
+
+	ATF_TP_ADD_TC(tp, statfs_success);
+	ATF_TP_ADD_TC(tp, statfs_failure);
+	ATF_TP_ADD_TC(tp, fstatfs_success);
+	ATF_TP_ADD_TC(tp, fstatfs_failure);
 
 	ATF_TP_ADD_TC(tp, access_success);
 	ATF_TP_ADD_TC(tp, access_failure);

@@ -26,20 +26,205 @@
  * $FreeBSD$
  */
 
+#include <sys/stat.h>
 #include <sys/syscall.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "utils.h"
 
 static struct pollfd fds[1];
+
 static mode_t mode = 0777;
+static struct stat statbuff;
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
 static const char *successreg = "fileforaudit.*return,success";
 static const char *failurereg = "fileforaudit.*return,failure";
+
+
+ATF_TC_WITH_CLEANUP(stat_success);
+ATF_TC_HEAD(stat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"stat(2) call");
+}
+
+ATF_TC_BODY(stat_success, tc)
+{
+	/* File needs to exist to call stat(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, stat(path, &statbuff));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(stat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(stat_failure);
+ATF_TC_HEAD(stat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"stat(2) call");
+}
+
+ATF_TC_BODY(stat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, stat(errpath, &statbuff));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(stat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(lstat_success);
+ATF_TC_HEAD(lstat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"lstat(2) call");
+}
+
+ATF_TC_BODY(lstat_success, tc)
+{
+	/* Symbolic link needs to exist to call lstat(2) */
+	ATF_REQUIRE_EQ(0, symlink("symlink", path));
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, lstat(path, &statbuff));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(lstat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(lstat_failure);
+ATF_TC_HEAD(lstat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"lstat(2) call");
+}
+
+ATF_TC_BODY(lstat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: symbolic link does not exist */
+	ATF_REQUIRE_EQ(-1, lstat(errpath, &statbuff));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(lstat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fstat_success);
+ATF_TC_HEAD(fstat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fstat(2) call");
+}
+
+ATF_TC_BODY(fstat_success, tc)
+{
+	int filedesc;
+	char regex[30];
+
+	/* File needs to exist to call fstat(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, fstat(filedesc, &statbuff));
+
+	snprintf(regex, 30, "fstat.*%u.*return,success", statbuff.st_ino);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fstat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fstat_failure);
+ATF_TC_HEAD(fstat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fstat(2) call");
+}
+
+ATF_TC_BODY(fstat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	const char *regex = "fstat.*return,failure : Bad file descriptor";
+	/* Failure reason: bad file descriptor */
+	ATF_REQUIRE_EQ(-1, fstat(-1, &statbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fstat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fstatat_success);
+ATF_TC_HEAD(fstatat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fstatat(2) call");
+}
+
+ATF_TC_BODY(fstatat_success, tc)
+{
+	/* File or Symbolic link needs to exist to call lstat(2) */
+	ATF_REQUIRE_EQ(0, symlink("symlink", path));
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, fstatat(AT_FDCWD, path, &statbuff, \
+		AT_SYMLINK_NOFOLLOW));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(fstatat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fstatat_failure);
+ATF_TC_HEAD(fstatat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fstatat(2) call");
+}
+
+ATF_TC_BODY(fstatat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: symbolic link does not exist */
+	ATF_REQUIRE_EQ(-1, fstatat(AT_FDCWD, path, &statbuff, \
+		AT_SYMLINK_NOFOLLOW));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(fstatat_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(access_success);
@@ -941,6 +1126,15 @@ ATF_TC_CLEANUP(openat_read_write_creat_trunc_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, stat_success);
+	ATF_TP_ADD_TC(tp, stat_failure);
+	ATF_TP_ADD_TC(tp, lstat_success);
+	ATF_TP_ADD_TC(tp, lstat_failure);
+	ATF_TP_ADD_TC(tp, fstat_success);
+	ATF_TP_ADD_TC(tp, fstat_failure);
+	ATF_TP_ADD_TC(tp, fstatat_success);
+	ATF_TP_ADD_TC(tp, fstatat_failure);
+
 	ATF_TP_ADD_TC(tp, access_success);
 	ATF_TP_ADD_TC(tp, access_failure);
 	ATF_TP_ADD_TC(tp, eaccess_success);

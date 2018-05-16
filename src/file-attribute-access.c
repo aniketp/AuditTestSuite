@@ -28,6 +28,7 @@
 
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <sys/ucred.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
 
@@ -319,6 +320,49 @@ ATF_TC_BODY(fstatfs_failure, tc)
 }
 
 ATF_TC_CLEANUP(fstatfs_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(getfsstat_success);
+ATF_TC_HEAD(getfsstat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"getfsstat(2) call");
+}
+
+ATF_TC_BODY(getfsstat_success, tc)
+{
+	const char *regex = "getfsstat.*return,success";
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE(getfsstat(NULL, 0, MNT_NOWAIT) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(getfsstat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(getfsstat_failure);
+ATF_TC_HEAD(getfsstat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"getfsstat(2) call");
+}
+
+ATF_TC_BODY(getfsstat_failure, tc)
+{
+	const char *regex = "getfsstat.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: Invalid value for mode */
+	ATF_REQUIRE_EQ(-1, getfsstat(NULL, 0, -1));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(getfsstat_failure, tc)
 {
 	cleanup();
 }
@@ -1368,6 +1412,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, statfs_failure);
 	ATF_TP_ADD_TC(tp, fstatfs_success);
 	ATF_TP_ADD_TC(tp, fstatfs_failure);
+
+	ATF_TP_ADD_TC(tp, getfsstat_success);
+	ATF_TP_ADD_TC(tp, getfsstat_failure);
 
 	ATF_TP_ADD_TC(tp, access_success);
 	ATF_TP_ADD_TC(tp, access_failure);

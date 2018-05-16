@@ -43,6 +43,7 @@
 static struct pollfd fds[1];
 
 static mode_t mode = 0777;
+static fhandle_t fht;
 static struct stat statbuff;
 static struct statfs statfsbuff;
 static const char *path = "fileforaudit";
@@ -363,6 +364,150 @@ ATF_TC_BODY(getfsstat_failure, tc)
 }
 
 ATF_TC_CLEANUP(getfsstat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fhopen_success);
+ATF_TC_HEAD(fhopen_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fhopen(2) call");
+}
+
+ATF_TC_BODY(fhopen_success, tc)
+{
+	const char *regex = "fhopen.*return,success";
+	/* File needs to exist to get a file-handle */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	/* Get the file handle to be passed to fhopen(2) */
+	ATF_REQUIRE_EQ(0, getfh(path, &fht));
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE(fhopen(&fht, O_RDWR) != -1);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fhopen_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fhopen_failure);
+ATF_TC_HEAD(fhopen_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fhopen(2) call");
+}
+
+ATF_TC_BODY(fhopen_failure, tc)
+{
+	const char *regex = "fhopen.*return,failure : Stale NFS file handle";
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: fht does not represent any file */
+	ATF_REQUIRE_EQ(-1, fhopen(&fht, O_RDWR));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fhopen_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fhstat_success);
+ATF_TC_HEAD(fhstat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fstat(2) call");
+}
+
+ATF_TC_BODY(fhstat_success, tc)
+{
+	const char *regex = "fhstat.*return,success";
+	/* File needs to exist to get a file-handle */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	/* Get the file handle to be passed to fhstat(2) */
+	ATF_REQUIRE_EQ(0, getfh(path, &fht));
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, fhstat(&fht, &statbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fhstat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fhstat_failure);
+ATF_TC_HEAD(fhstat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fhstat(2) call");
+}
+
+ATF_TC_BODY(fhstat_failure, tc)
+{
+	const char *regex = "fhstat.*return,failure : Stale NFS file handle";
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: fht does not represent any file */
+	ATF_REQUIRE_EQ(-1, fhstat(&fht, &statbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fhstat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fhstatfs_success);
+ATF_TC_HEAD(fhstatfs_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fstatfs(2) call");
+}
+
+ATF_TC_BODY(fhstatfs_success, tc)
+{
+	const char *regex = "fhstatfs.*return,success";
+	/* File needs to exist to get a file-handle */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	/* Get the file handle to be passed to fhstatfs(2) */
+	ATF_REQUIRE_EQ(0, getfh(path, &fht));
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(0, fhstatfs(&fht, &statfsbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fhstatfs_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fhstatfs_failure);
+ATF_TC_HEAD(fhstatfs_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fhstatfs(2) call");
+}
+
+ATF_TC_BODY(fhstatfs_failure, tc)
+{
+	const char *regex = "fhstatfs.*return,failure : Stale NFS file handle";
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: fht does not represent any file */
+	ATF_REQUIRE_EQ(-1, fhstatfs(&fht, &statfsbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fhstatfs_failure, tc)
 {
 	cleanup();
 }
@@ -1415,6 +1560,13 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, getfsstat_success);
 	ATF_TP_ADD_TC(tp, getfsstat_failure);
+
+	ATF_TP_ADD_TC(tp, fhopen_success);
+	ATF_TP_ADD_TC(tp, fhopen_failure);
+	ATF_TP_ADD_TC(tp, fhstat_success);
+	ATF_TP_ADD_TC(tp, fhstat_failure);
+	ATF_TP_ADD_TC(tp, fhstatfs_success);
+	ATF_TP_ADD_TC(tp, fhstatfs_failure);
 
 	ATF_TP_ADD_TC(tp, access_success);
 	ATF_TP_ADD_TC(tp, access_failure);

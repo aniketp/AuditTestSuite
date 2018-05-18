@@ -946,6 +946,63 @@ ATF_TC_CLEANUP(extattr_get_link_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(extattr_list_fd_success);
+ATF_TC_HEAD(extattr_list_fd_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"extattr_list_fd(2) call");
+}
+
+ATF_TC_BODY(extattr_list_fd_success, tc)
+{
+	int filedesc, readbuff;
+	const char *buff = "ezio";
+	/* File needs to exist to call extattr_list_fd(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_set_file(path, \
+		EXTATTR_NAMESPACE_USER, name, buff, sizeof(buff)));
+
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_fd.*return,success,%d", readbuff);
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE((readbuff = extattr_list_fd(filedesc, \
+		EXTATTR_NAMESPACE_USER, name, NULL, 0)) != -1);
+	check_audit(fds, extregex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_list_fd_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_list_fd_failure);
+ATF_TC_HEAD(extattr_list_fd_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"extattr_list_fd(2) call");
+}
+
+ATF_TC_BODY(extattr_list_fd_failure, tc)
+{
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_fd.*return,failure : "
+				"Bad file descriptor");
+
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: Invalid file descriptor */
+	ATF_REQUIRE_EQ(-1, extattr_list_fd(-1, \
+		EXTATTR_NAMESPACE_USER, name, NULL, 0));
+	check_audit(fds, extregex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_list_fd_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(open_read_creat_success);
 ATF_TC_HEAD(open_read_creat_success, tc)
 {

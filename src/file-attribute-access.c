@@ -27,10 +27,12 @@
  */
 
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/ucred.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
+#include <sys/extattr.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
@@ -769,6 +771,127 @@ ATF_TC_BODY(fpathconf_failure, tc)
 }
 
 ATF_TC_CLEANUP(fpathconf_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_get_file_success);
+ATF_TC_HEAD(extattr_get_file_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"extattr_get_file(2) call");
+}
+
+ATF_TC_BODY(extattr_get_file_success, tc)
+{
+	char regex[60];
+	const char *buff = "ezio";
+	const char *name = "authorname";
+	/* File needs to exist to call extattr_get_file(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_set_file(path, \
+		EXTATTR_NAMESPACE_USER, name, buff, sizeof(buff)));
+
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 60, "extattr_get_file.*%s.*%s.*return,success,%lu", \
+		path, name, sizeof(buff));
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_get_file(path, \
+		EXTATTR_NAMESPACE_USER, name, NULL, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_get_file_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_get_file_failure);
+ATF_TC_HEAD(extattr_get_file_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"extattr_get_file(2) call");
+}
+
+ATF_TC_BODY(extattr_get_file_failure, tc)
+{
+	char regex[60];
+	const char *name = "authorname";
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 60, "extattr_get_file.*%s.*%s.*failure", path, name);
+
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, extattr_get_file(path, \
+		EXTATTR_NAMESPACE_USER, name, NULL, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_get_file_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_get_fd_success);
+ATF_TC_HEAD(extattr_get_fd_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"extattr_get_fd(2) call");
+}
+
+ATF_TC_BODY(extattr_get_fd_success, tc)
+{
+	int filedesc;
+	char regex[50];
+	const char *buff = "ezio";
+	const char *name = "authorname";
+	/* File needs to exist to call extattr_get_fd(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_set_file(path, \
+		EXTATTR_NAMESPACE_USER, name, buff, sizeof(buff)));
+
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 50, "extattr_get_fd.*%s.*return,success", name);
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_get_fd(filedesc, \
+		EXTATTR_NAMESPACE_USER, name, NULL, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_get_fd_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_get_fd_failure);
+ATF_TC_HEAD(extattr_get_fd_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"extattr_get_fd(2) call");
+}
+
+ATF_TC_BODY(extattr_get_fd_failure, tc)
+{
+	char regex[80];
+	const char *name = "authorname";
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 80, "extattr_get_fd.*%s.*return,failure : "
+	"Bad file descriptor", name);
+
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: Invalid file descriptor */
+	ATF_REQUIRE_EQ(-1, extattr_get_fd(-1, \
+		EXTATTR_NAMESPACE_USER, name, NULL, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_get_fd_failure, tc)
 {
 	cleanup();
 }
@@ -1581,6 +1704,11 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, lpathconf_failure);
 	ATF_TP_ADD_TC(tp, fpathconf_success);
 	ATF_TP_ADD_TC(tp, fpathconf_failure);
+
+	ATF_TP_ADD_TC(tp, extattr_get_file_success);
+	ATF_TP_ADD_TC(tp, extattr_get_file_failure);
+	ATF_TP_ADD_TC(tp, extattr_get_fd_success);
+	ATF_TP_ADD_TC(tp, extattr_get_fd_failure);
 
 	ATF_TP_ADD_TC(tp, open_read_creat_success);
 	ATF_TP_ADD_TC(tp, open_read_creat_failure);

@@ -36,8 +36,105 @@
 
 static struct pollfd fds[1];
 static mode_t mode = 0777;
+static struct stat statbuff;
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
+static const char *successreg = "fileforaudit.*return,success";
+static const char *failurereg = "fileforaudit.*return,failure";
+
+
+ATF_TC_WITH_CLEANUP(chmod_success);
+ATF_TC_HEAD(chmod_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"chmod(2) call");
+}
+
+ATF_TC_BODY(chmod_success, tc)
+{
+	/* File needs to exist to call chmod(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, chmod(path, mode));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(chmod_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(chmod_failure);
+ATF_TC_HEAD(chmod_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"chmod(2) call");
+}
+
+ATF_TC_BODY(chmod_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(0, chmod(errpath, mode));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(chmod_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fchmod_success);
+ATF_TC_HEAD(fchmod_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fchmod(2) call");
+}
+
+ATF_TC_BODY(fchmod_success, tc)
+{
+	int filedesc;
+	char regex[30];
+
+	/* File needs to exist to call fchmod(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
+	ATF_REQUIRE_EQ(0, fstat(filedesc, &statbuff));
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 30, "fchmod.*%u.*return,success", statbuff.st_ino);
+
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, fchmod(filedesc, mode));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fchmod_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fchmod_failure);
+ATF_TC_HEAD(fchmod_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fchmod(2) call");
+}
+
+ATF_TC_BODY(fchmod_failure, tc)
+{
+	const char *regex = "fchmod.*return,failure : Bad file descriptor"
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: Invalid file descriptor */
+	ATF_REQUIRE_EQ(0, fchmod(-1, mode));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fchmod_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(open_read_creat_success);

@@ -946,6 +946,62 @@ ATF_TC_CLEANUP(extattr_get_link_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(extattr_list_file_success);
+ATF_TC_HEAD(extattr_list_file_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"extattr_list_file(2) call");
+}
+
+ATF_TC_BODY(extattr_list_file_success, tc)
+{
+	int readbuff;
+	const char *buff = "ezio";
+	/* File needs to exist to call extattr_list_file(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_set_file(path, \
+		EXTATTR_NAMESPACE_USER, name, buff, sizeof(buff)));
+
+	FILE *pipefd = setup(fds, "fa");
+	ATF_REQUIRE((readbuff = extattr_list_file(path, \
+		EXTATTR_NAMESPACE_USER, NULL, 0)) != -1);
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_file.*%s.*return,success,%d", \
+		path, readbuff);
+	check_audit(fds, extregex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_list_file_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_list_file_failure);
+ATF_TC_HEAD(extattr_list_file_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"extattr_list_file(2) call");
+}
+
+ATF_TC_BODY(extattr_list_file_failure, tc)
+{
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_file.*%s.*return,failure", path);
+
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, extattr_list_file(path, \
+		EXTATTR_NAMESPACE_USER, NULL, 0));
+	check_audit(fds, extregex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_list_file_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(extattr_list_fd_success);
 ATF_TC_HEAD(extattr_list_fd_success, tc)
 {
@@ -957,17 +1013,17 @@ ATF_TC_BODY(extattr_list_fd_success, tc)
 {
 	int filedesc, readbuff;
 	const char *buff = "ezio";
+
 	/* File needs to exist to call extattr_list_fd(2) */
 	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
 	ATF_REQUIRE_EQ(sizeof(buff), extattr_set_file(path, \
 		EXTATTR_NAMESPACE_USER, name, buff, sizeof(buff)));
 
-	/* Prepare the regex to be checked in the audit record */
-	snprintf(extregex, 80, "extattr_list_fd.*return,success,%d", readbuff);
-
 	FILE *pipefd = setup(fds, "fa");
 	ATF_REQUIRE((readbuff = extattr_list_fd(filedesc, \
-		EXTATTR_NAMESPACE_USER, name, NULL, 0)) != -1);
+		EXTATTR_NAMESPACE_USER, NULL, 0)) != -1);
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_fd.*return,success,%d", readbuff);
 	check_audit(fds, extregex, pipefd);
 }
 
@@ -992,12 +1048,67 @@ ATF_TC_BODY(extattr_list_fd_failure, tc)
 
 	FILE *pipefd = setup(fds, "fa");
 	/* Failure reason: Invalid file descriptor */
-	ATF_REQUIRE_EQ(-1, extattr_list_fd(-1, \
-		EXTATTR_NAMESPACE_USER, name, NULL, 0));
+	ATF_REQUIRE_EQ(-1, extattr_list_fd(-1, EXTATTR_NAMESPACE_USER, NULL, 0));
 	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(extattr_list_fd_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_list_link_success);
+ATF_TC_HEAD(extattr_list_link_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"extattr_list_link(2) call");
+}
+
+ATF_TC_BODY(extattr_list_link_success, tc)
+{
+	int readbuff;
+	const char *buff = "ezio";
+
+	/* Symbolic link needs to exist to call extattr_list_link(2) */
+	ATF_REQUIRE_EQ(0, symlink("symlink", path));
+	ATF_REQUIRE_EQ(sizeof(buff), extattr_set_link(path, \
+		EXTATTR_NAMESPACE_USER, name, buff, sizeof(buff)));
+	FILE *pipefd = setup(fds, "fa");
+
+	ATF_REQUIRE((readbuff = extattr_list_link(path, \
+		EXTATTR_NAMESPACE_USER, NULL, 0)) != -1);
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_link.*%s.*return,success,%d", \
+		path, readbuff);
+	check_audit(fds, extregex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_list_link_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(extattr_list_link_failure);
+ATF_TC_HEAD(extattr_list_link_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"extattr_list_link(2) call");
+}
+
+ATF_TC_BODY(extattr_list_link_failure, tc)
+{
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(extregex, 80, "extattr_list_link.*%s.*failure", path);
+	FILE *pipefd = setup(fds, "fa");
+	/* Failure reason: symbolic link does not exist */
+	ATF_REQUIRE_EQ(-1, extattr_list_link(path, \
+		EXTATTR_NAMESPACE_USER, NULL, 0));
+	check_audit(fds, extregex, pipefd);
+}
+
+ATF_TC_CLEANUP(extattr_list_link_failure, tc)
 {
 	cleanup();
 }
@@ -1817,6 +1928,13 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, extattr_get_fd_failure);
 	ATF_TP_ADD_TC(tp, extattr_get_link_success);
 	ATF_TP_ADD_TC(tp, extattr_get_link_failure);
+
+	ATF_TP_ADD_TC(tp, extattr_list_file_success);
+	ATF_TP_ADD_TC(tp, extattr_list_file_failure);
+	ATF_TP_ADD_TC(tp, extattr_list_fd_success);
+	ATF_TP_ADD_TC(tp, extattr_list_fd_failure);
+	ATF_TP_ADD_TC(tp, extattr_list_link_success);
+	ATF_TP_ADD_TC(tp, extattr_list_link_failure);
 
 	ATF_TP_ADD_TC(tp, open_read_creat_success);
 	ATF_TP_ADD_TC(tp, open_read_creat_failure);

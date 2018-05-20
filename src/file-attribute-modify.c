@@ -26,6 +26,7 @@
  * $FreeBSD$
  */
 
+#include <sys/stat.h>
 #include <sys/syscall.h>
 
 #include <atf-c.h>
@@ -76,7 +77,7 @@ ATF_TC_BODY(chmod_failure, tc)
 {
 	FILE *pipefd = setup(fds, "fm");
 	/* Failure reason: file does not exist */
-	ATF_REQUIRE_EQ(0, chmod(errpath, mode));
+	ATF_REQUIRE_EQ(-1, chmod(errpath, mode));
 	check_audit(fds, failurereg, pipefd);
 }
 
@@ -102,7 +103,7 @@ ATF_TC_BODY(fchmod_success, tc)
 	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
 	ATF_REQUIRE_EQ(0, fstat(filedesc, &statbuff));
 	/* Prepare the regex to be checked in the audit record */
-	snprintf(regex, 30, "fchmod.*%u.*return,success", statbuff.st_ino);
+	snprintf(regex, 30, "fchmod.*%lu.*return,success", statbuff.st_ino);
 
 	FILE *pipefd = setup(fds, "fm");
 	ATF_REQUIRE_EQ(0, fchmod(filedesc, mode));
@@ -124,14 +125,100 @@ ATF_TC_HEAD(fchmod_failure, tc)
 
 ATF_TC_BODY(fchmod_failure, tc)
 {
-	const char *regex = "fchmod.*return,failure : Bad file descriptor"
+	const char *regex = "fchmod.*return,failure : Bad file descriptor";
 	FILE *pipefd = setup(fds, "fm");
 	/* Failure reason: Invalid file descriptor */
-	ATF_REQUIRE_EQ(0, fchmod(-1, mode));
+	ATF_REQUIRE_EQ(-1, fchmod(-1, mode));
 	check_audit(fds, regex, pipefd);
 }
 
 ATF_TC_CLEANUP(fchmod_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(lchmod_success);
+ATF_TC_HEAD(lchmod_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"lchmod(2) call");
+}
+
+ATF_TC_BODY(lchmod_success, tc)
+{
+	/* Symbolic link needs to exist to call lchmod(2) */
+	ATF_REQUIRE_EQ(0, symlink("symlink", path));
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, lchmod(path, mode));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(lchmod_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(lchmod_failure);
+ATF_TC_HEAD(lchmod_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"lchmod(2) call");
+}
+
+ATF_TC_BODY(lchmod_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, lchmod(errpath, mode));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(lchmod_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fchmodat_success);
+ATF_TC_HEAD(fchmodat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fchmodat(2) call");
+}
+
+ATF_TC_BODY(fchmodat_success, tc)
+{
+	/* File needs to exist to call fchmodat(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, fchmodat(AT_FDCWD, path, mode, 0));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(fchmodat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fchmodat_failure);
+ATF_TC_HEAD(fchmodat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fchmodat(2) call");
+}
+
+ATF_TC_BODY(fchmodat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, fchmodat(AT_FDCWD, errpath, mode, 0));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(fchmodat_failure, tc)
 {
 	cleanup();
 }
@@ -907,6 +994,15 @@ ATF_TC_CLEANUP(openat_read_write_creat_trunc_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, chmod_success);
+	ATF_TP_ADD_TC(tp, chmod_failure);
+	ATF_TP_ADD_TC(tp, fchmod_success);
+	ATF_TP_ADD_TC(tp, fchmod_failure);
+	ATF_TP_ADD_TC(tp, lchmod_success);
+	ATF_TP_ADD_TC(tp, lchmod_failure);
+	ATF_TP_ADD_TC(tp, fchmodat_success);
+	ATF_TP_ADD_TC(tp, fchmodat_failure);
+
 	ATF_TP_ADD_TC(tp, open_read_creat_success);
 	ATF_TP_ADD_TC(tp, open_read_creat_failure);
 	ATF_TP_ADD_TC(tp, openat_read_creat_success);

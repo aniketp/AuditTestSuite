@@ -352,7 +352,7 @@ ATF_TC_HEAD(lchown_failure, tc)
 ATF_TC_BODY(lchown_failure, tc)
 {
 	FILE *pipefd = setup(fds, "fm");
-	/* Failure reason: file does not exist */
+	/* Failure reason: Symbolic link does not exist */
 	ATF_REQUIRE_EQ(-1, lchown(errpath, uid, gid));
 	check_audit(fds, failurereg, pipefd);
 }
@@ -401,6 +401,186 @@ ATF_TC_BODY(fchownat_failure, tc)
 }
 
 ATF_TC_CLEANUP(fchownat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(chflags_success);
+ATF_TC_HEAD(chflags_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"chflags(2) call");
+}
+
+ATF_TC_BODY(chflags_success, tc)
+{
+	/* File needs to exist to call chflags(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, chflags(path, SF_IMMUTABLE));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(chflags_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(chflags_failure);
+ATF_TC_HEAD(chflags_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"chflags(2) call");
+}
+
+ATF_TC_BODY(chflags_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, chflags(errpath, SF_IMMUTABLE));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(chflags_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fchflags_success);
+ATF_TC_HEAD(fchflags_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fchflags(2) call");
+}
+
+ATF_TC_BODY(fchflags_success, tc)
+{
+	int filedesc;
+	char regex[30];
+
+	/* File needs to exist to call fchflags(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
+	ATF_REQUIRE_EQ(0, fstat(filedesc, &statbuff));
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 30, "fchflags.*%lu.*return,success", statbuff.st_ino);
+
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, fchflags(filedesc, SF_IMMUTABLE));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fchflags_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fchflags_failure);
+ATF_TC_HEAD(fchflags_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fchflags(2) call");
+}
+
+ATF_TC_BODY(fchflags_failure, tc)
+{
+	const char *regex = "fchflags.*return,failure : Bad file descriptor";
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: Invalid file descriptor */
+	ATF_REQUIRE_EQ(-1, fchflags(-1, SF_IMMUTABLE));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fchflags_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(lchflags_success);
+ATF_TC_HEAD(lchflags_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"lchflags(2) call");
+}
+
+ATF_TC_BODY(lchflags_success, tc)
+{
+	/* Symbolic link needs to exist to call lchflags(2) */
+	ATF_REQUIRE_EQ(0, symlink("symlink", path));
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, lchflags(path, SF_IMMUTABLE));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(lchflags_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(lchflags_failure);
+ATF_TC_HEAD(lchflags_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"lchflags(2) call");
+}
+
+ATF_TC_BODY(lchflags_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: Symbolic link does not exist */
+	ATF_REQUIRE_EQ(-1, lchflags(errpath, SF_IMMUTABLE));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(lchflags_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(chflagsat_success);
+ATF_TC_HEAD(chflagsat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"chflagsat(2) call");
+}
+
+ATF_TC_BODY(chflagsat_success, tc)
+{
+	/* File needs to exist to call chflagsat(2) */
+	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, chflagsat(AT_FDCWD, path, SF_IMMUTABLE, 0));
+	check_audit(fds, successreg, pipefd);
+}
+
+ATF_TC_CLEANUP(chflagsat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(chflagsat_failure);
+ATF_TC_HEAD(chflagsat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"chflagsat(2) call");
+}
+
+ATF_TC_BODY(chflagsat_failure, tc)
+{
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, chflagsat(AT_FDCWD, errpath, SF_IMMUTABLE, 0));
+	check_audit(fds, failurereg, pipefd);
+}
+
+ATF_TC_CLEANUP(chflagsat_failure, tc)
 {
 	cleanup();
 }
@@ -1193,6 +1373,15 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, lchown_failure);
 	ATF_TP_ADD_TC(tp, fchownat_success);
 	ATF_TP_ADD_TC(tp, fchownat_failure);
+
+	ATF_TP_ADD_TC(tp, chflags_success);
+	ATF_TP_ADD_TC(tp, chflags_failure);
+	ATF_TP_ADD_TC(tp, fchflags_success);
+	ATF_TP_ADD_TC(tp, fchflags_failure);
+	ATF_TP_ADD_TC(tp, lchflags_success);
+	ATF_TP_ADD_TC(tp, lchflags_failure);
+	ATF_TP_ADD_TC(tp, chflagsat_success);
+	ATF_TP_ADD_TC(tp, chflagsat_failure);
 
 	ATF_TP_ADD_TC(tp, open_read_creat_success);
 	ATF_TP_ADD_TC(tp, open_read_creat_failure);

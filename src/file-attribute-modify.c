@@ -27,11 +27,14 @@
  */
 
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/syscall.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -910,6 +913,48 @@ ATF_TC_CLEANUP(futimesat_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(mprotect_success);
+ATF_TC_HEAD(mprotect_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"mprotect(2) call");
+}
+
+ATF_TC_BODY(mprotect_success, tc)
+{
+	const char *regex = "mprotect.*return,success";
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, mprotect(NULL, 0, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(mprotect_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(mprotect_failure);
+ATF_TC_HEAD(mprotect_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"mprotect(2) call");
+}
+
+ATF_TC_BODY(mprotect_failure, tc)
+{
+	const char *regex = "mprotect.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(-1, mprotect((void *)SIZE_MAX, -1, PROT_NONE));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(mprotect_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(open_read_creat_success);
 ATF_TC_HEAD(open_read_creat_success, tc)
 {
@@ -1724,6 +1769,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, lutimes_failure);
 	ATF_TP_ADD_TC(tp, futimesat_success);
 	ATF_TP_ADD_TC(tp, futimesat_failure);
+
+	ATF_TP_ADD_TC(tp, mprotect_success);
+	ATF_TP_ADD_TC(tp, mprotect_failure);
 
 	ATF_TP_ADD_TC(tp, open_read_creat_success);
 	ATF_TP_ADD_TC(tp, open_read_creat_failure);

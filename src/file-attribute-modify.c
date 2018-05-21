@@ -27,6 +27,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/syscall.h>
 
 #include <atf-c.h>
@@ -131,6 +132,57 @@ ATF_TC_BODY(fcntl_failure, tc)
 }
 
 ATF_TC_CLEANUP(fcntl_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fsync_success);
+ATF_TC_HEAD(fsync_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fsync(2) call");
+}
+
+ATF_TC_BODY(fsync_success, tc)
+{
+	int filedesc;
+	char regex[30];
+
+	/* File needs to exist to call fsync(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
+	ATF_REQUIRE_EQ(0, fstat(filedesc, &statbuff));
+	/* Prepare the regex to be checked in the audit record */
+	snprintf(regex, 30, "fsync.*%lu.*return,success", statbuff.st_ino);
+
+	FILE *pipefd = setup(fds, "fm");
+	ATF_REQUIRE_EQ(0, fsync(filedesc));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fsync_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fsync_failure);
+ATF_TC_HEAD(fsync_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fsync(2) call");
+}
+
+ATF_TC_BODY(fsync_failure, tc)
+{
+	const char *regex = "fsync.*return,failure : Bad file descriptor";
+	FILE *pipefd = setup(fds, "fm");
+	/* Failure reason: Invalid file descriptor */
+	ATF_REQUIRE_EQ(-1, fsync(-1));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(fsync_failure, tc)
 {
 	cleanup();
 }
@@ -1633,6 +1685,9 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, fcntl_success);
 	ATF_TP_ADD_TC(tp, fcntl_failure);
+
+	ATF_TP_ADD_TC(tp, fsync_success);
+	ATF_TP_ADD_TC(tp, fsync_failure);
 
 	ATF_TP_ADD_TC(tp, chmod_success);
 	ATF_TP_ADD_TC(tp, chmod_failure);

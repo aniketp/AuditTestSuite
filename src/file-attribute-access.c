@@ -298,7 +298,7 @@ ATF_TC_BODY(fstatfs_success, tc)
 	FILE *pipefd = setup(fds, "fa");
 	ATF_REQUIRE_EQ(0, fstatfs(filedesc, &statfsbuff));
 
-	snprintf(regex, 30, "fstatfs.*%u.*return,success", statbuff.st_ino);
+	snprintf(regex, 30, "fstatfs.*%lu.*return,success", statbuff.st_ino);
 	check_audit(fds, regex, pipefd);
 }
 

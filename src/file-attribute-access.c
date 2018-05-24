@@ -43,7 +43,6 @@
 #include "utils.h"
 
 static struct pollfd fds[1];
-
 static fhandle_t fht;
 static mode_t mode = 0777;
 static char extregex[80];

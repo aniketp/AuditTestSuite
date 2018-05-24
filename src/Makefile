@@ -9,6 +9,7 @@ ATF_TESTS_C+=	file-write
 ATF_TESTS_C+=	file-close
 ATF_TESTS_C+=	file-attribute-access
 ATF_TESTS_C+=	file-attribute-modify
+ATF_TESTS_C+=	exec
 
 SRCS.file-create+=	file-create.c
 SRCS.file-create+=	utils.c
@@ -24,6 +25,8 @@ SRCS.file-attribute-access+=	file-attribute-access.c
 SRCS.file-attribute-access+=	utils.c
 SRCS.file-attribute-modify+=	file-attribute-modify.c
 SRCS.file-attribute-modify+=	utils.c
+SRCS.exec+=	exec.c
+SRCS.exec+=	utils.c
 
 TEST_METADATA.file-create+= timeout="30"
 TEST_METADATA.file-create+= required_user="root"
@@ -39,6 +42,8 @@ TEST_METADATA.file-attribute-access+= timeout="30"
 TEST_METADATA.file-attribute-access+= required_user="root"
 TEST_METADATA.file-attribute-modify+= timeout="30"
 TEST_METADATA.file-attribute-modify+= required_user="root"
+TEST_METADATA.exec+= timeout="30"
+TEST_METADATA.exec+= required_user="root"
 
 WARNS?=	6
 

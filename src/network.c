@@ -26,63 +26,58 @@
  * $FreeBSD$
  */
 
-#include <sys/ioctl.h>
+#include <sys/socket.h>
 
 #include <atf-c.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <bsm/libbsm.h>
-#include <security/audit/audit_ioctl.h>
 
 #include "utils.h"
+#define ERROR (-1)
 
+static int sockfd;
 static struct pollfd fds[1];
+static char regex[40];
 
-
-ATF_TC_WITH_CLEANUP(ioctl_success);
-ATF_TC_HEAD(ioctl_success, tc)
+ATF_TC_WITH_CLEANUP(socket_success);
+ATF_TC_HEAD(socket_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-					"ioctl(2) call");
+					"socket(2) call");
 }
 
-ATF_TC_BODY(ioctl_success, tc)
+ATF_TC_BODY(socket_success, tc)
 {
-	int filedesc;
-	char regex[30];
-
-	/* auditpipe(4) supports quite a few ioctl(2)s */
-	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
-	/* Prepare the regex to be checked in the audit record */
-	snprintf(regex, 30, "ioctl.*0x%x.*return,success", filedesc);
-
-	FILE *pipefd = setup(fds, "io");
-	ATF_REQUIRE(ioctl(filedesc, AUDITPIPE_FLUSH) != -1);
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	/* Check the presence of sockfd in audit record */
+	snprintf(regex, 30, "socket.*return,success,%d", sockfd);
 	check_audit(fds, regex, pipefd);
+	close(sockfd);
 }
 
-ATF_TC_CLEANUP(ioctl_success, tc)
+ATF_TC_CLEANUP(socket_success, tc)
 {
 	cleanup();
 }
 
 
-ATF_TC_WITH_CLEANUP(ioctl_failure);
-ATF_TC_HEAD(ioctl_failure, tc)
+ATF_TC_WITH_CLEANUP(socket_failure);
+ATF_TC_HEAD(socket_failure, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
-					"ioctl(2) call");
+					"socket(2) call");
 }
 
-ATF_TC_BODY(ioctl_failure, tc)
+ATF_TC_BODY(socket_failure, tc)
 {
-	const char *regex = "ioctl.*return,failure : Bad file descriptor";
-	FILE *pipefd = setup(fds, "io");
-	ATF_REQUIRE_EQ(-1, ioctl(-1, AUDITPIPE_FLUSH));
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, socket(ERROR, SOCK_STREAM, 0));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "socket.*0x%x.*return,failure", ERROR);
 	check_audit(fds, regex, pipefd);
 }
 
-ATF_TC_CLEANUP(ioctl_failure, tc)
+ATF_TC_CLEANUP(socket_failure, tc)
 {
 	cleanup();
 }
@@ -90,8 +85,8 @@ ATF_TC_CLEANUP(ioctl_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
-	ATF_TP_ADD_TC(tp, ioctl_success);
-	ATF_TP_ADD_TC(tp, ioctl_failure);
+	ATF_TP_ADD_TC(tp, socket_success);
+	ATF_TP_ADD_TC(tp, socket_failure);
 
 	return (atf_no_error());
 }

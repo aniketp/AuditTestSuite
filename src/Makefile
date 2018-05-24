@@ -10,6 +10,7 @@ ATF_TESTS_C+=	file-close
 ATF_TESTS_C+=	file-attribute-access
 ATF_TESTS_C+=	file-attribute-modify
 ATF_TESTS_C+=	exec
+ATF_TESTS_C+=	ioctl
 
 SRCS.file-create+=	file-create.c
 SRCS.file-create+=	utils.c
@@ -27,6 +28,8 @@ SRCS.file-attribute-modify+=	file-attribute-modify.c
 SRCS.file-attribute-modify+=	utils.c
 SRCS.exec+=	exec.c
 SRCS.exec+=	utils.c
+SRCS.ioctl+=	ioctl.c
+SRCS.ioctl+=	utils.c
 
 TEST_METADATA.file-create+= timeout="30"
 TEST_METADATA.file-create+= required_user="root"
@@ -44,6 +47,8 @@ TEST_METADATA.file-attribute-modify+= timeout="30"
 TEST_METADATA.file-attribute-modify+= required_user="root"
 TEST_METADATA.exec+= timeout="30"
 TEST_METADATA.exec+= required_user="root"
+TEST_METADATA.ioctl+= timeout="30"
+TEST_METADATA.ioctl+= required_user="root"
 
 WARNS?=	6
 

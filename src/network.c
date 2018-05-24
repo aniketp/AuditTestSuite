@@ -35,6 +35,7 @@
 #define ERROR (-1)
 
 static int sockfd;
+static int tr = 1;
 static struct pollfd fds[1];
 static char regex[40];
 
@@ -83,10 +84,61 @@ ATF_TC_CLEANUP(socket_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(setsockopt_success);
+ATF_TC_HEAD(setsockopt_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setsockopt(2) call");
+}
+
+ATF_TC_BODY(setsockopt_success, tc)
+{
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	/* Check the presence of sockfd in audit record */
+	snprintf(regex, 30, "setsockopt.*0x%x.*return,success", sockfd);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
+		sizeof(int)))
+	check_audit(fds, regex, pipefd);
+	close(sockfd);
+}
+
+ATF_TC_CLEANUP(setsockopt_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setsockopt_failure);
+ATF_TC_HEAD(setsockopt_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"setsockopt(2) call");
+}
+
+ATF_TC_BODY(setsockopt_failure, tc)
+{
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, setsockopt(ERROR, SOL_SOCKET, SO_REUSEADDR, &tr, \
+		sizeof(int)));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "setsockopt.*0x%x.*return,failure", ERROR);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(setsockopt_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, socket_success);
 	ATF_TP_ADD_TC(tp, socket_failure);
+	ATF_TP_ADD_TC(tp, setsockopt_success);
+	ATF_TP_ADD_TC(tp, setsockopt_failure);
 
 	return (atf_no_error());
 }

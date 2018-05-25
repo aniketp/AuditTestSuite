@@ -33,6 +33,7 @@
 #include <arpa/inet.h>
 
 #include <atf-c.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -193,6 +194,7 @@ ATF_TC_HEAD(bind_failure, tc)
 
 ATF_TC_BODY(bind_failure, tc)
 {
+	/* Preliminary socket setup */
 	struct sockaddr_in server;
 	len = sizeof(struct sockaddr_in);
 	assign_address(&server);
@@ -210,6 +212,66 @@ ATF_TC_CLEANUP(bind_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(bindat_success);
+ATF_TC_HEAD(bindat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"bindat(2) call");
+}
+
+ATF_TC_BODY(bindat_success, tc)
+{
+	/* Preliminary socket setup */
+	struct sockaddr_in server;
+	len = sizeof(struct sockaddr_in);
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
+		sizeof(int)));
+	assign_address(&server);
+
+	/* Check the presence of localhost address and port in audit record */
+	snprintf(regex, 30, "bindat.*0x%x.*return,success", sockfd);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, bindat(AT_FDCWD, sockfd, \
+		(struct sockaddr *)&server, len));
+	check_audit(fds, regex, pipefd);
+	close(sockfd);
+}
+
+ATF_TC_CLEANUP(bindat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(bindat_failure);
+ATF_TC_HEAD(bindat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"bindat(2) call");
+}
+
+ATF_TC_BODY(bindat_failure, tc)
+{
+	/* Preliminary socket setup */
+	struct sockaddr_in server;
+	len = sizeof(struct sockaddr_in);
+	assign_address(&server);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, bindat(AT_FDCWD, -1, (struct sockaddr *)&server, len));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "bindat.*0x%x.*return,failure", ERROR);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(bindat_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, socket_success);
@@ -218,6 +280,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, setsockopt_failure);
 	ATF_TP_ADD_TC(tp, bind_success);
 	ATF_TP_ADD_TC(tp, bind_failure);
+	ATF_TP_ADD_TC(tp, bindat_success);
+	ATF_TP_ADD_TC(tp, bindat_failure);
 
 	return (atf_no_error());
 }

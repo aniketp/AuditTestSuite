@@ -26,7 +26,11 @@
  * $FreeBSD$
  */
 
+#include <sys/types.h>
 #include <sys/socket.h>
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <atf-c.h>
 #include <unistd.h>
@@ -36,8 +40,23 @@
 
 static int sockfd;
 static int tr = 1;
+static socklen_t len;
 static struct pollfd fds[1];
 static char regex[40];
+
+/*
+ * Assign local address to a server's socket
+ */
+static void
+assign_address(struct sockaddr_in *server)
+{
+	/* Assigning addresses */
+	server->sin_family = AF_INET;		/* IPv4 */
+	server->sin_port = htons(9000);		/* Port in network bytes */
+	server->sin_addr.s_addr = inet_addr("127.0.0.1");
+	bzero(&(server)->sin_zero, 8);		/* Zero padding */
+}
+
 
 ATF_TC_WITH_CLEANUP(socket_success);
 ATF_TC_HEAD(socket_success, tc)
@@ -99,7 +118,7 @@ ATF_TC_BODY(setsockopt_success, tc)
 
 	FILE *pipefd = setup(fds, "nt");
 	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
-		sizeof(int)))
+		sizeof(int)));
 	check_audit(fds, regex, pipefd);
 	close(sockfd);
 }
@@ -133,12 +152,72 @@ ATF_TC_CLEANUP(setsockopt_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(bind_success);
+ATF_TC_HEAD(bind_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"bind(2) call");
+}
+
+ATF_TC_BODY(bind_success, tc)
+{
+	/* Preliminary socket setup */
+	struct sockaddr_in server;
+	len = sizeof(struct sockaddr_in);
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
+		sizeof(int)));
+	assign_address(&server);
+
+	/* Check the presence of localhost address and port in audit record */
+	snprintf(regex, 30, "bind.*9000,127.0.0.1.*return,success");
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
+	check_audit(fds, regex, pipefd);
+	close(sockfd);
+}
+
+ATF_TC_CLEANUP(bind_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(bind_failure);
+ATF_TC_HEAD(bind_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"bind(2) call");
+}
+
+ATF_TC_BODY(bind_failure, tc)
+{
+	struct sockaddr_in server;
+	len = sizeof(struct sockaddr_in);
+	assign_address(&server);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, bind(-1, (struct sockaddr *)&server, len));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "bind.*0x%x.*9000,127.0.0.1.*return,failure", ERROR);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(bind_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, socket_success);
 	ATF_TP_ADD_TC(tp, socket_failure);
 	ATF_TP_ADD_TC(tp, setsockopt_success);
 	ATF_TP_ADD_TC(tp, setsockopt_failure);
+	ATF_TP_ADD_TC(tp, bind_success);
+	ATF_TP_ADD_TC(tp, bind_failure);
 
 	return (atf_no_error());
 }

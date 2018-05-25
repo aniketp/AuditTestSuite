@@ -69,7 +69,7 @@ ATF_TC_HEAD(socket_success, tc)
 ATF_TC_BODY(socket_success, tc)
 {
 	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
 	/* Check the presence of sockfd in audit record */
 	snprintf(regex, 30, "socket.*return,success,%d", sockfd);
 	check_audit(fds, regex, pipefd);
@@ -92,13 +92,36 @@ ATF_TC_HEAD(socket_failure, tc)
 ATF_TC_BODY(socket_failure, tc)
 {
 	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, socket(ERROR, SOCK_STREAM, 0));
+	ATF_REQUIRE_EQ(-1, socket(ERROR, SOCK_STREAM, IPPROTO_TCP));
 	/* Check the presence of hex(-1) in audit record */
 	snprintf(regex, 40, "socket.*0x%x.*return,failure", ERROR);
 	check_audit(fds, regex, pipefd);
 }
 
 ATF_TC_CLEANUP(socket_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(socketpair_failure);
+ATF_TC_HEAD(socketpair_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"socketpair(2) call");
+}
+
+ATF_TC_BODY(socketpair_failure, tc)
+{
+	int sv;
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, socketpair(ERROR, SOCK_STREAM, IPPROTO_TCP, &sv));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "socket.*0x%x.*return,failure", ERROR);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(socketpair_failure, tc)
 {
 	cleanup();
 }
@@ -113,7 +136,7 @@ ATF_TC_HEAD(setsockopt_success, tc)
 
 ATF_TC_BODY(setsockopt_success, tc)
 {
-	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
 	/* Check the presence of sockfd in audit record */
 	snprintf(regex, 30, "setsockopt.*0x%x.*return,success", sockfd);
 
@@ -165,7 +188,7 @@ ATF_TC_BODY(bind_success, tc)
 	/* Preliminary socket setup */
 	struct sockaddr_in server;
 	len = sizeof(struct sockaddr_in);
-	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
 	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
 		sizeof(int)));
 	assign_address(&server);
@@ -224,7 +247,7 @@ ATF_TC_BODY(bindat_success, tc)
 	/* Preliminary socket setup */
 	struct sockaddr_in server;
 	len = sizeof(struct sockaddr_in);
-	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
 	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
 		sizeof(int)));
 	assign_address(&server);
@@ -276,6 +299,7 @@ ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, socket_success);
 	ATF_TP_ADD_TC(tp, socket_failure);
+	ATF_TP_ADD_TC(tp, socketpair_failure);
 	ATF_TP_ADD_TC(tp, setsockopt_success);
 	ATF_TP_ADD_TC(tp, setsockopt_failure);
 	ATF_TP_ADD_TC(tp, bind_success);

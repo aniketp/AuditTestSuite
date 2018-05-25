@@ -39,7 +39,7 @@
 #include "utils.h"
 #define ERROR (-1)
 
-static int sockfd;
+static int sockfd, sockfd2;
 static int tr = 1;
 static socklen_t len;
 static struct pollfd fds[1];
@@ -104,6 +104,31 @@ ATF_TC_CLEANUP(socket_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(socketpair_success);
+ATF_TC_HEAD(socketpair_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"socketpair(2) call");
+}
+
+ATF_TC_BODY(socketpair_success, tc)
+{
+	int sv[2];
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, socketpair(PF_UNIX, SOCK_STREAM, 0, sv));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "socketpair.*0x0.*return,success");
+	check_audit(fds, regex, pipefd);
+	close(sv[0]);
+	close(sv[1]);
+}
+
+ATF_TC_CLEANUP(socketpair_success, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(socketpair_failure);
 ATF_TC_HEAD(socketpair_failure, tc)
 {
@@ -117,7 +142,7 @@ ATF_TC_BODY(socketpair_failure, tc)
 	FILE *pipefd = setup(fds, "nt");
 	ATF_REQUIRE_EQ(-1, socketpair(ERROR, SOCK_STREAM, IPPROTO_TCP, &sv));
 	/* Check the presence of hex(-1) in audit record */
-	snprintf(regex, 40, "socket.*0x%x.*return,failure", ERROR);
+	snprintf(regex, 40, "socketpair.*0x%x.*return,failure", ERROR);
 	check_audit(fds, regex, pipefd);
 }
 
@@ -295,17 +320,113 @@ ATF_TC_CLEANUP(bindat_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(listen_success);
+ATF_TC_HEAD(listen_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"listen(2) call");
+}
+
+ATF_TC_BODY(listen_success, tc)
+{
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
+	/* Check the presence of sockfd in audit record */
+	snprintf(regex, 30, "listen.*0x%x.*return,success", sockfd);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
+	check_audit(fds, regex, pipefd);
+	close(sockfd);
+}
+
+ATF_TC_CLEANUP(listen_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(listen_failure);
+ATF_TC_HEAD(listen_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"listen(2) call");
+}
+
+ATF_TC_BODY(listen_failure, tc)
+{
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, listen(ERROR, 1));
+	/* Check the presence of hex(-1) in audit record */
+	snprintf(regex, 40, "listen.*0x%x.*return,failure", ERROR);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(listen_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(connect_success);
+ATF_TC_HEAD(connect_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"connect(2) call");
+}
+
+ATF_TC_BODY(connect_success, tc)
+{
+	struct sockaddr_in server;
+	len = sizeof(struct sockaddr_in);
+
+	/* Server Socket: Assign address and listen for connection */
+	ATF_REQUIRE((sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
+	/* Non-blocking server socket */
+	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
+	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
+		sizeof(int)));
+	assign_address(&server);
+	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
+	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
+
+	/* Set up "blocking" client socket */
+	ATF_REQUIRE((sockfd2 = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) != -1);
+
+	/* Audit record must contain, address, port & sockfd2 */
+	snprintf(regex, 30, "connect.*0x%x.*9000,127.0.0.1.*success", sockfd2);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
+	check_audit(fds, regex, pipefd);
+
+	/* Close all socket descriptors */
+	close(sockfd);
+	close(sockfd2);
+}
+
+ATF_TC_CLEANUP(connect_success, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, socket_success);
 	ATF_TP_ADD_TC(tp, socket_failure);
+	ATF_TP_ADD_TC(tp, socketpair_success);
 	ATF_TP_ADD_TC(tp, socketpair_failure);
 	ATF_TP_ADD_TC(tp, setsockopt_success);
 	ATF_TP_ADD_TC(tp, setsockopt_failure);
+
 	ATF_TP_ADD_TC(tp, bind_success);
 	ATF_TP_ADD_TC(tp, bind_failure);
 	ATF_TP_ADD_TC(tp, bindat_success);
 	ATF_TP_ADD_TC(tp, bindat_failure);
+	ATF_TP_ADD_TC(tp, listen_success);
+	ATF_TP_ADD_TC(tp, listen_failure);
+
+	ATF_TP_ADD_TC(tp, connect_success);
 
 	return (atf_no_error());
 }

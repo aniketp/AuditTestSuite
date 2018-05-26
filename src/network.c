@@ -27,7 +27,9 @@
  */
 
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/un.h>
 
 #include <netinet/in.h>
@@ -38,14 +40,17 @@
 #include <unistd.h>
 
 #include "utils.h"
+
 #define ERROR (-1)
 #define SERVER_PATH "server"
+#define MAX_DATA 1024
 
 static int sockfd, sockfd2;
 static int tr = 1;
 static socklen_t len;
 static struct pollfd fds[1];
 static char regex[60];
+static char data[MAX_DATA];
 static char msgbuff[] = "Sample Message\n";
 
 /*
@@ -57,6 +62,22 @@ assign_address(struct sockaddr_un *server)
 	memset(server, 0, sizeof(*server));
 	server->sun_family = AF_UNIX;
 	strcpy(server->sun_path, SERVER_PATH);
+}
+
+/*
+ * Check the read status of client socket descriptor
+ */
+static int
+check_readfs(int clientfd)
+{
+	/* Initialize fd_set using the provided MACROS for select() */
+	fd_set readfs;
+	FD_ZERO(&readfs);
+ 	FD_SET(clientfd, &readfs);
+
+	/* Check if clientfd is ready for receiving data and return */
+	ATF_REQUIRE(select(clientfd+1, &readfs, NULL, NULL, NULL) > 0);
+	return (FD_ISSET(clientfd, &readfs));
 }
 
 
@@ -612,7 +633,7 @@ ATF_TC_BODY(send_success, tc)
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
-	/* Set up "blocking" client and connect with non-blocking server*/
+	/* Set up "blocking" client and connect with non-blocking server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
 	ATF_REQUIRE((clientfd = accept(sockfd, \
@@ -623,7 +644,7 @@ ATF_TC_BODY(send_success, tc)
 	ATF_REQUIRE((bytes_sent = \
 		send(sockfd2, msgbuff, strlen(msgbuff), 0)) != -1);
 
-	/* Audit record must contain  sockfd2 and bytes_sent */
+	/* Audit record must contain sockfd2 and bytes_sent */
 	snprintf(regex, 60, \
 		"send.*0x%x.*return,success,%zd", sockfd2, bytes_sent);
 	check_audit(fds, regex, pipefd);
@@ -662,6 +683,82 @@ ATF_TC_CLEANUP(send_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(recv_success);
+ATF_TC_HEAD(recv_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"recv(2) call");
+}
+
+ATF_TC_BODY(recv_success, tc)
+{
+	/* Preliminary socket setup */
+	int clientfd;
+	ssize_t bytes_recv;
+	struct sockaddr_un server, client;
+	assign_address(&server);
+	len = sizeof(struct sockaddr_un);
+
+	/* Server Socket: Assign address and listen for connection */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
+	/* Non-blocking server socket */
+	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
+	/* Bind to the specified address and wait for connection */
+	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
+	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
+
+	/* Set up "blocking" client and connect with non-blocking server */
+	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
+	ATF_REQUIRE((clientfd = accept(sockfd, \
+		(struct sockaddr *)&client, &len)) != -1);
+	/* Send a sample message to the connected socket */
+	ATF_REQUIRE(send(sockfd2, msgbuff, strlen(msgbuff), 0) != -1);
+
+	/* Receive data once clientfd is ready for reading */
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE(check_readfs(clientfd) != 0);
+	ATF_REQUIRE((bytes_recv = recv(clientfd, data, MAX_DATA, 0)) != 0);
+
+	/* Audit record must contain clientfd and bytes_sent */
+	snprintf(regex, 60, \
+		"recv.*0x%x.*return,success,%zd", clientfd, bytes_recv);
+	check_audit(fds, regex, pipefd);
+
+	/* Close all socket descriptors */
+	close(sockfd);
+	close(sockfd2);
+	close(clientfd);
+}
+
+ATF_TC_CLEANUP(recv_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(recv_failure);
+ATF_TC_HEAD(recv_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"recv(2) call");
+}
+
+ATF_TC_BODY(recv_failure, tc)
+{
+	/* Audit record must contain Hex(-1) */
+	snprintf(regex, 60, "recv.*0x%x.*return,failure", ERROR);
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, recv(ERROR, data, MAX_DATA, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(recv_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(sendto_success);
 ATF_TC_HEAD(sendto_success, tc)
 {
@@ -686,7 +783,7 @@ ATF_TC_BODY(sendto_success, tc)
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
-	/* Set up "blocking" client and connect with non-blocking server*/
+	/* Set up "blocking" client and connect with non-blocking server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
 	ATF_REQUIRE((clientfd = accept(sockfd, \
@@ -741,6 +838,88 @@ ATF_TC_CLEANUP(sendto_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(recvfrom_success);
+ATF_TC_HEAD(recvfrom_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"recvfrom(2) call");
+}
+
+ATF_TC_BODY(recvfrom_success, tc)
+{
+	/* Preliminary socket setup */
+	int clientfd;
+	ssize_t bytes_recv;
+	struct sockaddr_un server, client;
+	assign_address(&server);
+	len = sizeof(struct sockaddr_un);
+
+	/* Server Socket: Assign address and listen for connection */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
+	/* Non-blocking server socket */
+	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
+	/* Bind to the specified address and wait for connection */
+	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
+	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
+
+	/* Set up "blocking" client and connect with non-blocking server */
+	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
+	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
+	ATF_REQUIRE((clientfd = accept(sockfd, \
+		(struct sockaddr *)&client, &len)) != -1);
+	/* Send a sample message to the connected socket */
+	ATF_REQUIRE(send(sockfd2, msgbuff, strlen(msgbuff), 0) != -1);
+
+	/* Receive data once clientfd is ready for reading */
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE(check_readfs(clientfd) != 0);
+	ATF_REQUIRE((bytes_recv = recvfrom(clientfd, data, \
+		MAX_DATA, 0, (struct sockaddr *)&client, &len)) != 0);
+
+	/* Audit record must contain clientfd and bytes_sent */
+	snprintf(regex, 60, \
+		"recvfrom.*0x%x.*return,success,%zd", clientfd, bytes_recv);
+	check_audit(fds, regex, pipefd);
+
+	/* Close all socket descriptors */
+	close(sockfd);
+	close(sockfd2);
+	close(clientfd);
+}
+
+ATF_TC_CLEANUP(recvfrom_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(recvfrom_failure);
+ATF_TC_HEAD(recvfrom_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"recvfrom(2) call");
+}
+
+ATF_TC_BODY(recvfrom_failure, tc)
+{
+	/* Preliminary client address setup */
+	struct sockaddr_un client;
+	len = sizeof(struct sockaddr_un);
+
+	/* Audit record must contain Hex(-1) */
+	snprintf(regex, 60, "recvfrom.*0x%x.*return,failure", ERROR);
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, recvfrom(ERROR, data, \
+		MAX_DATA, 0, (struct sockaddr *)&client, &len));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(recvfrom_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(shutdown_success);
 ATF_TC_HEAD(shutdown_success, tc)
 {
@@ -763,7 +942,7 @@ ATF_TC_BODY(shutdown_success, tc)
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
-	/* Set up "blocking" client and connect with non-blocking server*/
+	/* Set up "blocking" client and connect with non-blocking server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
 	ATF_REQUIRE((clientfd = accept(sockfd, \
@@ -835,8 +1014,13 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, send_success);
 	ATF_TP_ADD_TC(tp, send_failure);
+	ATF_TP_ADD_TC(tp, recv_success);
+	ATF_TP_ADD_TC(tp, recv_failure);
+
 	ATF_TP_ADD_TC(tp, sendto_success);
 	ATF_TP_ADD_TC(tp, sendto_failure);
+	ATF_TP_ADD_TC(tp, recvfrom_success);
+	ATF_TP_ADD_TC(tp, recvfrom_failure);
 
 	ATF_TP_ADD_TC(tp, shutdown_success);
 	ATF_TP_ADD_TC(tp, shutdown_failure);

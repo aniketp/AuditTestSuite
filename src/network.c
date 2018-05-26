@@ -86,7 +86,7 @@ check_readfs(int clientfd)
 }
 
 /*
- * Initialize iovec structure to be used in struct msghdr
+ * Initialize iovec structure to be used as a field of struct msghdr 
  */
 static void
 init_iov(struct iovec *io, char msgbuf[], int DATALEN)
@@ -96,7 +96,7 @@ init_iov(struct iovec *io, char msgbuf[], int DATALEN)
 }
 
 /*
- * Initialize msghdr structure for UDP communication
+ * Initialize msghdr structure for communication via datagram sockets
  */
 static void
 init_msghdr(struct msghdr *hdrbuf, struct iovec *io, struct sockaddr_un *address)
@@ -605,7 +605,7 @@ ATF_TC_BODY(accept_success, tc)
 	ATF_REQUIRE((clientfd = accept(sockfd, \
 		(struct sockaddr *)&client, &len)) != -1);
 
-	/* Audit record must contain clientfd & sockfd2 */
+	/* Audit record must contain clientfd & sockfd */
 	snprintf(regex, 60, \
 		"accept.*0x%x.*return,success,%d", sockfd, clientfd);
 	check_audit(fds, regex, pipefd);
@@ -756,7 +756,7 @@ ATF_TC_BODY(recv_success, tc)
 	ATF_REQUIRE(check_readfs(clientfd) != 0);
 	ATF_REQUIRE((bytes_recv = recv(clientfd, data, MAX_DATA, 0)) != 0);
 
-	/* Audit record must contain clientfd and bytes_sent */
+	/* Audit record must contain clientfd and bytes_recv */
 	snprintf(regex, 60, \
 		"recv.*0x%x.*return,success,%zd", clientfd, bytes_recv);
 	check_audit(fds, regex, pipefd);
@@ -950,6 +950,82 @@ ATF_TC_CLEANUP(recvfrom_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(sendmsg_success);
+ATF_TC_HEAD(sendmsg_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"recvmsg(2) call");
+}
+
+ATF_TC_BODY(sendmsg_success, tc)
+{
+	/* Preliminary socket setup */
+	ssize_t bytes_sent;
+	struct msghdr sendbuf = {}, recvbuf = {};
+	struct iovec io1, io2;
+	struct sockaddr_un server, client;
+	assign_address(&server);
+	len = sizeof(struct sockaddr_un);
+
+	/* Create a datagram server socket & bind to UNIX address family */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
+	/* Non-blocking server socket */
+	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
+	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
+
+	/* Message buffer to be sent to the server */
+	init_iov(&io1, msgbuff, sizeof(msgbuff));
+	init_msghdr(&sendbuf, &io1, &server);
+
+	/* Prepare buffer to store the received data in */
+	init_iov(&io2, data, MAX_DATA);
+	init_msghdr(&recvbuf, &io2, &client);
+
+	/* Set up "blocking" UDP client to communicate with the server */
+	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
+
+	/* Send a sample message to the specified client address */
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE((bytes_sent = sendmsg(sockfd2, &sendbuf, 0)) != -1);
+
+	/* Audit record must contain sockfd2 and bytes_sent */
+	snprintf(regex, 60, \
+		"sendmsg.*0x%x.*return,success,%zd", sockfd2, bytes_sent);
+	check_audit(fds, regex, pipefd);
+
+	/* Close all socket descriptors */
+	close_sockets(2, sockfd, sockfd2);
+}
+
+ATF_TC_CLEANUP(sendmsg_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(sendmsg_failure);
+ATF_TC_HEAD(sendmsg_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"sendmsg(2) call");
+}
+
+ATF_TC_BODY(sendmsg_failure, tc)
+{
+	struct msghdr msgbuf;
+	/* Audit record must contain Hex(-1) */
+	snprintf(regex, 60, "sendmsg.*return,failure : Message too long");
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, sendmsg(ERROR, &msgbuf, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(sendmsg_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(recvmsg_success);
 ATF_TC_HEAD(recvmsg_success, tc)
 {
@@ -967,11 +1043,10 @@ ATF_TC_BODY(recvmsg_success, tc)
 	assign_address(&server);
 	len = sizeof(struct sockaddr_un);
 
-	/* Server Socket: Assign address and listen for connection */
+	/* Create a datagram server socket & bind to UNIX address family */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 	/* Non-blocking server socket */
 	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 
 	/* Message buffer to be sent to the server */
@@ -982,7 +1057,7 @@ ATF_TC_BODY(recvmsg_success, tc)
 	init_iov(&io2, data, MAX_DATA);
 	init_msghdr(&recvbuf, &io2, &client);
 
-	/* Set up "blocking" client and connect with non-blocking server */
+	/* Set up "blocking" UDP client to communicate with the server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 	/* Send a sample message to the connected socket */
 	ATF_REQUIRE(sendmsg(sockfd2, &sendbuf, 0) != -1);
@@ -992,7 +1067,7 @@ ATF_TC_BODY(recvmsg_success, tc)
 	ATF_REQUIRE(check_readfs(sockfd) != 0);
 	ATF_REQUIRE((bytes_recv = recvmsg(sockfd, &recvbuf, 0)) != -1);
 
-	/* Audit record must contain clientfd and bytes_sent */
+	/* Audit record must contain sockfd and bytes_recv */
 	snprintf(regex, 60, \
 		"recvmsg.*0x%x.*return,success,%zd", sockfd, bytes_recv);
 	check_audit(fds, regex, pipefd);
@@ -1002,6 +1077,29 @@ ATF_TC_BODY(recvmsg_success, tc)
 }
 
 ATF_TC_CLEANUP(recvmsg_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(recvmsg_failure);
+ATF_TC_HEAD(recvmsg_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"recvmsg(2) call");
+}
+
+ATF_TC_BODY(recvmsg_failure, tc)
+{
+	struct msghdr msgbuf;
+	/* Audit record must contain Hex(-1) */
+	snprintf(regex, 60, "recvmsg.*return,failure : Message too long");
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, recvmsg(ERROR, &msgbuf, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(recvmsg_failure, tc)
 {
 	cleanup();
 }
@@ -1036,7 +1134,7 @@ ATF_TC_BODY(shutdown_success, tc)
 	ATF_REQUIRE((clientfd = accept(sockfd, \
 		(struct sockaddr *)&client, &len)) != -1);
 
-	/* Audit record must contain clientfd & sockfd2 */
+	/* Audit record must contain clientfd */
 	snprintf(regex, 60, "shutdown.*0x%x.*return,success", clientfd);
 
 	FILE *pipefd = setup(fds, "nt");
@@ -1107,7 +1205,11 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, sendto_failure);
 	ATF_TP_ADD_TC(tp, recvfrom_success);
 	ATF_TP_ADD_TC(tp, recvfrom_failure);
+
+	ATF_TP_ADD_TC(tp, sendmsg_success);
+	ATF_TP_ADD_TC(tp, sendmsg_failure);
 	ATF_TP_ADD_TC(tp, recvmsg_success);
+	ATF_TP_ADD_TC(tp, recvmsg_failure);
 
 	ATF_TP_ADD_TC(tp, shutdown_success);
 	ATF_TP_ADD_TC(tp, shutdown_failure);

@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     ssize_t length;
 
     int len = sizeof(struct sockaddr_in);
-    client = (struct sockaddr_in *) malloc (sizeof(struct sockaddr_in));
+    //client = (struct sockaddr_in *) malloc (sizeof(struct sockaddr_in));
 
     if((sockfd = socket(PF_INET, SOCK_DGRAM, 0)) == ERROR){
         perror("Socket error");

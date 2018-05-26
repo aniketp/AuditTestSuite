@@ -86,6 +86,30 @@ check_readfs(int clientfd)
 }
 
 /*
+ * Initialize iovec structure to be used in struct msghdr
+ */
+static void
+init_iov(struct iovec *io, char msgbuf[], int DATALEN)
+{
+	io->iov_base = msgbuf;
+	io->iov_len = DATALEN;
+}
+
+/*
+ * Initialize msghdr structure for UDP communication
+ */
+static void
+init_msghdr(struct msghdr *hdrbuf, struct iovec *io, struct sockaddr_un *address)
+{
+	ssize_t length;
+	length = sizeof(struct sockaddr_un);
+	hdrbuf->msg_name = address;
+	hdrbuf->msg_namelen = length;
+	hdrbuf->msg_iov = io;
+	hdrbuf->msg_iovlen = 1;
+}
+
+/*
  * Variadic function to close socket descriptors
  */
 static void
@@ -926,6 +950,64 @@ ATF_TC_CLEANUP(recvfrom_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(recvmsg_success);
+ATF_TC_HEAD(recvmsg_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"recvmsg(2) call");
+}
+
+ATF_TC_BODY(recvmsg_success, tc)
+{
+	/* Preliminary socket setup */
+	ssize_t bytes_recv;
+	struct msghdr sendbuf = {}, recvbuf = {};
+	struct iovec io1, io2;
+	struct sockaddr_un server, client;
+	assign_address(&server);
+	len = sizeof(struct sockaddr_un);
+
+	/* Server Socket: Assign address and listen for connection */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
+	/* Non-blocking server socket */
+	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
+	/* Bind to the specified address and wait for connection */
+	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
+
+	/* Message buffer to be sent to the server */
+	init_iov(&io1, msgbuff, sizeof(msgbuff));
+	init_msghdr(&sendbuf, &io1, &server);
+
+	/* Prepare buffer to store the received data in */
+	init_iov(&io2, data, MAX_DATA);
+	init_msghdr(&recvbuf, &io2, &client);
+
+	/* Set up "blocking" client and connect with non-blocking server */
+	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
+	/* Send a sample message to the connected socket */
+	ATF_REQUIRE(sendmsg(sockfd2, &sendbuf, 0) != -1);
+
+	/* Receive data once clientfd is ready for reading */
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE(check_readfs(sockfd) != 0);
+	ATF_REQUIRE((bytes_recv = recvmsg(sockfd, &recvbuf, 0)) != -1);
+
+	/* Audit record must contain clientfd and bytes_sent */
+	snprintf(regex, 60, \
+		"recvmsg.*0x%x.*return,success,%zd", sockfd, bytes_recv);
+	check_audit(fds, regex, pipefd);
+
+	/* Close all socket descriptors */
+	close_sockets(2, sockfd, sockfd2);
+}
+
+ATF_TC_CLEANUP(recvmsg_success, tc)
+{
+	cleanup();
+}
+
+
+
 ATF_TC_WITH_CLEANUP(shutdown_success);
 ATF_TC_HEAD(shutdown_success, tc)
 {
@@ -1025,6 +1107,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, sendto_failure);
 	ATF_TP_ADD_TC(tp, recvfrom_success);
 	ATF_TP_ADD_TC(tp, recvfrom_failure);
+	ATF_TP_ADD_TC(tp, recvmsg_success);
 
 	ATF_TP_ADD_TC(tp, shutdown_success);
 	ATF_TP_ADD_TC(tp, shutdown_failure);

@@ -37,6 +37,7 @@
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -70,14 +71,33 @@ assign_address(struct sockaddr_un *server)
 static int
 check_readfs(int clientfd)
 {
+	struct timeval timeout;
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+
 	/* Initialize fd_set using the provided MACROS for select() */
 	fd_set readfs;
 	FD_ZERO(&readfs);
  	FD_SET(clientfd, &readfs);
 
 	/* Check if clientfd is ready for receiving data and return */
-	ATF_REQUIRE(select(clientfd+1, &readfs, NULL, NULL, NULL) > 0);
+	ATF_REQUIRE(select(clientfd+1, &readfs, NULL, NULL, &timeout) > 0);
 	return (FD_ISSET(clientfd, &readfs));
+}
+
+/*
+ * Variadic function to close socket descriptors
+ */
+static void
+close_sockets(int count, ...)
+{
+	int sockd;
+	va_list socklist;
+	va_start(socklist, count);
+	for (sockd = 0; sockd < count; sockd++) {
+		close(va_arg(socklist, int));
+	}
+	va_end(socklist);
 }
 
 
@@ -141,10 +161,8 @@ ATF_TC_BODY(socketpair_success, tc)
 	/* Check the presence of 0x0 in audit record */
 	snprintf(regex, 60, "socketpair.*0x0.*return,success");
 	check_audit(fds, regex, pipefd);
-
 	/* Close all socket descriptors */
-	close(sv[0]);
-	close(sv[1]);
+	close_sockets(2, sv[0], sv[1]);
 }
 
 ATF_TC_CLEANUP(socketpair_success, tc)
@@ -425,8 +443,7 @@ ATF_TC_BODY(connect_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
+	close_sockets(2, sockfd, sockfd2);
 }
 
 ATF_TC_CLEANUP(connect_success, tc)
@@ -496,8 +513,7 @@ ATF_TC_BODY(connectat_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
+	close_sockets(2, sockfd, sockfd2);
 }
 
 ATF_TC_CLEANUP(connectat_success, tc)
@@ -571,9 +587,7 @@ ATF_TC_BODY(accept_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
-	close(clientfd);
+	close_sockets(3, sockfd, sockfd2, clientfd);
 }
 
 ATF_TC_CLEANUP(accept_success, tc)
@@ -650,9 +664,7 @@ ATF_TC_BODY(send_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
-	close(clientfd);
+	close_sockets(3, sockfd, sockfd2, clientfd);
 }
 
 ATF_TC_CLEANUP(send_success, tc)
@@ -726,9 +738,7 @@ ATF_TC_BODY(recv_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
-	close(clientfd);
+	close_sockets(3, sockfd, sockfd2, clientfd);
 }
 
 ATF_TC_CLEANUP(recv_success, tc)
@@ -800,9 +810,7 @@ ATF_TC_BODY(sendto_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
-	close(clientfd);
+	close_sockets(3, sockfd, sockfd2, clientfd);
 }
 
 ATF_TC_CLEANUP(sendto_success, tc)
@@ -882,9 +890,7 @@ ATF_TC_BODY(recvfrom_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
-	close(clientfd);
+	close_sockets(3, sockfd, sockfd2, clientfd);
 }
 
 ATF_TC_CLEANUP(recvfrom_success, tc)
@@ -956,9 +962,7 @@ ATF_TC_BODY(shutdown_success, tc)
 	check_audit(fds, regex, pipefd);
 
 	/* Close all socket descriptors */
-	close(sockfd);
-	close(sockfd2);
-	close(clientfd);
+	close_sockets(3, sockfd, sockfd2, clientfd);
 }
 
 ATF_TC_CLEANUP(shutdown_success, tc)

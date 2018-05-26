@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/un.h>
 
@@ -46,13 +47,15 @@
 #define SERVER_PATH "server"
 #define MAX_DATA 1024
 
+static struct pollfd fds[1];
 static int sockfd, sockfd2;
 static int tr = 1;
 static socklen_t len;
-static struct pollfd fds[1];
+static mode_t mode = 0777;
 static char regex[60];
 static char data[MAX_DATA];
-static char msgbuff[] = "Sample Message\n";
+static char msgbuff[] = "Sample Message";
+static const char *path = "fileforaudit";
 
 /*
  * Assign local address to a server's socket
@@ -86,7 +89,7 @@ check_readfs(int clientfd)
 }
 
 /*
- * Initialize iovec structure to be used as a field of struct msghdr 
+ * Initialize iovec structure to be used as a field of struct msghdr
  */
 static void
 init_iov(struct iovec *io, char msgbuf[], int DATALEN)
@@ -1173,6 +1176,56 @@ ATF_TC_CLEANUP(shutdown_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(sendfile_success);
+ATF_TC_HEAD(sendfile_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"sendfile(2) call");
+}
+
+ATF_TC_BODY(sendfile_success, tc)
+{
+	int filedesc;
+	filedesc = open(path, O_CREAT | O_RDONLY, mode);
+	/* Create a simple UNIX socket to send out random data */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
+	/* Check the presence of sockfd,non-file in the audit record */
+	snprintf(regex, 60, "sendfile.*0x%x,non-file.*return,success", filedesc);
+
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(0, sendfile(filedesc, sockfd, 0, 0, NULL, NULL, 0));
+	check_audit(fds, regex, pipefd);
+	close(sockfd);
+}
+
+ATF_TC_CLEANUP(sendfile_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(sendfile_failure);
+ATF_TC_HEAD(sendfile_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"sendfile(2) call");
+}
+
+ATF_TC_BODY(sendfile_failure, tc)
+{
+	/* Audit record must contain Hex(-1) */
+	snprintf(regex, 60, "sendfile.*0x%x.*return,failure", ERROR);
+	FILE *pipefd = setup(fds, "nt");
+	ATF_REQUIRE_EQ(-1, sendfile(ERROR, ERROR, 0, 0, NULL, NULL, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(sendfile_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, socket_success);
@@ -1213,6 +1266,8 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, shutdown_success);
 	ATF_TP_ADD_TC(tp, shutdown_failure);
+	ATF_TP_ADD_TC(tp, sendfile_success);
+	ATF_TP_ADD_TC(tp, sendfile_failure);
 
 	return (atf_no_error());
 }

@@ -59,7 +59,8 @@ ATF_TC_BODY(execve_success, tc)
 	if (pid) {
 		ATF_REQUIRE(wait(&status) != -1);
 		check_audit(fds, regex, pipefd);
-	} else
+	}
+	else
 		ATF_REQUIRE(execve(bin, arg, NULL) != -1);
 }
 
@@ -85,7 +86,8 @@ ATF_TC_BODY(execve_failure, tc)
 	if (pid) {
 		ATF_REQUIRE(wait(&status) != -1);
 		check_audit(fds, regex, pipefd);
-	} else
+	}
+	else
 		ATF_REQUIRE_EQ(-1, execve(bin, arg, (char *const *)(-1)));
 }
 

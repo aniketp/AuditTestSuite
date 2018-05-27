@@ -360,10 +360,14 @@ ATF_TC_HEAD(msgctl_illegal_command, tc)
 ATF_TC_BODY(msgctl_illegal_command, tc)
 {
 	msqid = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR);
+
 	const char *regex = "msgctl.*illegal command.*failure : Invalid argument";
 	FILE *pipefd = setup(fds, "ip");
 	ATF_REQUIRE_EQ(-1, msgctl(msqid, -1, &msgbuff));
 	check_audit(fds, regex, pipefd);
+
+	/* Destroy the message queue with ID = msqid */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
 }
 
 ATF_TC_CLEANUP(msgctl_illegal_command, tc)
@@ -672,10 +676,14 @@ ATF_TC_HEAD(shmctl_illegal_command, tc)
 ATF_TC_BODY(shmctl_illegal_command, tc)
 {
 	shmid = shmget(IPC_PRIVATE, 10, IPC_CREAT | S_IRUSR);
+	
 	const char *regex = "shmctl.*illegal command.*failure : Invalid argument";
 	FILE *pipefd = setup(fds, "ip");
 	ATF_REQUIRE_EQ(-1, shmctl(shmid, -1, &shmbuff));
 	check_audit(fds, regex, pipefd);
+
+	/* Destroy the shared memory with ID = shmid */
+	ATF_REQUIRE_EQ(0, shmctl(shmid, IPC_RMID, NULL));
 }
 
 ATF_TC_CLEANUP(shmctl_illegal_command, tc)

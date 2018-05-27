@@ -37,28 +37,8 @@ SRCS.network+=	utils.c
 SRCS.inter-process+=	inter-process.c
 SRCS.inter-process+=	utils.c
 
-TEST_METADATA.file-create+= timeout="30"
-TEST_METADATA.file-create+= required_user="root"
-TEST_METADATA.file-delete+= timeout="30"
-TEST_METADATA.file-delete+= required_user="root"
-TEST_METADATA.file-read+= timeout="30"
-TEST_METADATA.file-read+= required_user="root"
-TEST_METADATA.file-write+= timeout="30"
-TEST_METADATA.file-write+= required_user="root"
-TEST_METADATA.file-close+= timeout="30"
-TEST_METADATA.file-close+= required_user="root"
-TEST_METADATA.file-attribute-access+= timeout="30"
-TEST_METADATA.file-attribute-access+= required_user="root"
-TEST_METADATA.file-attribute-modify+= timeout="30"
-TEST_METADATA.file-attribute-modify+= required_user="root"
-TEST_METADATA.exec+= timeout="30"
-TEST_METADATA.exec+= required_user="root"
-TEST_METADATA.ioctl+= timeout="30"
-TEST_METADATA.ioctl+= required_user="root"
-TEST_METADATA.network+= timeout="30"
-TEST_METADATA.network+= required_user="root"
-TEST_METADATA.inter-process+= timeout="30"
-TEST_METADATA.inter-process+= required_user="root"
+TEST_METADATA+= timeout="30"
+TEST_METADATA+= required_user="root"
 
 WARNS?=	6
 

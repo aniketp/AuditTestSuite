@@ -12,6 +12,7 @@ ATF_TESTS_C+=	file-attribute-modify
 ATF_TESTS_C+=	exec
 ATF_TESTS_C+=	ioctl
 ATF_TESTS_C+=	network
+ATF_TESTS_C+=	inter-process
 
 SRCS.file-create+=	file-create.c
 SRCS.file-create+=	utils.c
@@ -33,6 +34,8 @@ SRCS.ioctl+=	ioctl.c
 SRCS.ioctl+=	utils.c
 SRCS.network+=	network.c
 SRCS.network+=	utils.c
+SRCS.inter-process+=	inter-process.c
+SRCS.inter-process+=	utils.c
 
 TEST_METADATA.file-create+= timeout="30"
 TEST_METADATA.file-create+= required_user="root"
@@ -54,6 +57,8 @@ TEST_METADATA.ioctl+= timeout="30"
 TEST_METADATA.ioctl+= required_user="root"
 TEST_METADATA.network+= timeout="30"
 TEST_METADATA.network+= required_user="root"
+TEST_METADATA.inter-process+= timeout="30"
+TEST_METADATA.inter-process+= required_user="root"
 
 WARNS?=	6
 

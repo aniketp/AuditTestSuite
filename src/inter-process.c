@@ -62,6 +62,9 @@ ATF_TC_BODY(msgget_success, tc)
 	/* Check the presence of message queue ID in audit record */
 	snprintf(ipcregex, 60, "msgget.*return,success,%d", msqid);
 	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the message queue with ID = msqid */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
 }
 
 ATF_TC_CLEANUP(msgget_success, tc)
@@ -91,51 +94,6 @@ ATF_TC_CLEANUP(msgget_failure, tc)
 }
 
 
-ATF_TC_WITH_CLEANUP(msgctl_success);
-ATF_TC_HEAD(msgctl_success, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-					"msgctl(2) call");
-}
-
-ATF_TC_BODY(msgctl_success, tc)
-{
-	msqid = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR);
-
-	FILE *pipefd = setup(fds, "ip");
-	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_STAT, &msgbuff));
-	/* Check the presence of message queue ID in audit record */
-	snprintf(ipcregex, 60, "msgctl.*IPC_STAT.*%d.*return,success", msqid);
-	check_audit(fds, ipcregex, pipefd);
-}
-
-ATF_TC_CLEANUP(msgctl_success, tc)
-{
-	cleanup();
-}
-
-
-ATF_TC_WITH_CLEANUP(msgctl_failure);
-ATF_TC_HEAD(msgctl_failure, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
-					"msgctl(2) call");
-}
-
-ATF_TC_BODY(msgctl_failure, tc)
-{
-	const char *regex = "msgctl.*return,failure : Invalid argument";
-	FILE *pipefd = setup(fds, "ip");
-	ATF_REQUIRE_EQ(-1, msgctl(-1, IPC_STAT, &msgbuff));
-	check_audit(fds, regex, pipefd);
-}
-
-ATF_TC_CLEANUP(msgctl_failure, tc)
-{
-	cleanup();
-}
-
-
 ATF_TC_WITH_CLEANUP(msgsnd_success);
 ATF_TC_HEAD(msgsnd_success, tc)
 {
@@ -156,6 +114,9 @@ ATF_TC_BODY(msgsnd_success, tc)
 	FILE *pipefd = setup(fds, "ip");
 	ATF_REQUIRE_EQ(0, msgsnd(msqid, &msg1, msgsize, IPC_NOWAIT));
 	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the message queue with ID = msqid */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
 }
 
 ATF_TC_CLEANUP(msgsnd_success, tc)
@@ -212,6 +173,9 @@ ATF_TC_BODY(msgrcv_success, tc)
 	snprintf(ipcregex, 60, \
 		"msgrcv.*Message IPC,*%d.*return,success,%zd", msqid, recv_bytes);
 	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the message queue with ID = msqid */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
 }
 
 ATF_TC_CLEANUP(msgrcv_success, tc)
@@ -241,16 +205,164 @@ ATF_TC_CLEANUP(msgrcv_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(msgctl_rmid_success);
+ATF_TC_HEAD(msgctl_rmid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"msgctl(2) call for IPC_RMID command");
+}
+
+ATF_TC_BODY(msgctl_rmid_success, tc)
+{
+	msqid = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR);
+
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+	/* Check the presence of queue ID and IPC_RMID in audit record */
+	snprintf(ipcregex, 60, "msgctl.*IPC_RMID.*%d.*return,success", msqid);
+	check_audit(fds, ipcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(msgctl_rmid_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(msgctl_rmid_failure);
+ATF_TC_HEAD(msgctl_rmid_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"msgctl(2) call for IPC_RMID command");
+}
+
+ATF_TC_BODY(msgctl_rmid_failure, tc)
+{
+	const char *regex = "msgctl.*IPC_RMID.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(-1, msgctl(-1, IPC_RMID, NULL));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(msgctl_rmid_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(msgctl_stat_success);
+ATF_TC_HEAD(msgctl_stat_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"msgctl(2) call for IPC_STAT command");
+}
+
+ATF_TC_BODY(msgctl_stat_success, tc)
+{
+	msqid = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR);
+
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_STAT, &msgbuff));
+	/* Check the presence of queue ID and IPC_STAT in audit record */
+	snprintf(ipcregex, 60, "msgctl.*IPC_STAT.*%d.*return,success", msqid);
+	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the message queue with ID = msqid */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+}
+
+ATF_TC_CLEANUP(msgctl_stat_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(msgctl_stat_failure);
+ATF_TC_HEAD(msgctl_stat_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"msgctl(2) call for IPC_STAT command");
+}
+
+ATF_TC_BODY(msgctl_stat_failure, tc)
+{
+	const char *regex = "msgctl.*IPC_STAT.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(-1, msgctl(-1, IPC_STAT, &msgbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(msgctl_stat_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(msgctl_set_success);
+ATF_TC_HEAD(msgctl_set_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"msgctl(2) call for IPC_SET command");
+}
+
+ATF_TC_BODY(msgctl_set_success, tc)
+{
+	msqid = msgget(IPC_PRIVATE, IPC_CREAT | S_IRUSR);
+	/* Fill up the msgbuff structure to be used with IPC_SET */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_STAT, &msgbuff));
+
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_SET, &msgbuff));
+	/* Check the presence of message queue ID in audit record */
+	snprintf(ipcregex, 60, "msgctl.*IPC_SET.*%d.*return,success", msqid);
+	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the message queue with ID = msqid */
+	ATF_REQUIRE_EQ(0, msgctl(msqid, IPC_RMID, NULL));
+}
+
+ATF_TC_CLEANUP(msgctl_set_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(msgctl_set_failure);
+ATF_TC_HEAD(msgctl_set_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"msgctl(2) call for IPC_SET command");
+}
+
+ATF_TC_BODY(msgctl_set_failure, tc)
+{
+	const char *regex = "msgctl.*IPC_SET.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(-1, msgctl(-1, IPC_SET, &msgbuff));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(msgctl_set_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, msgget_success);
 	ATF_TP_ADD_TC(tp, msgget_failure);
-	ATF_TP_ADD_TC(tp, msgctl_success);
-	ATF_TP_ADD_TC(tp, msgctl_failure);
 	ATF_TP_ADD_TC(tp, msgsnd_success);
 	ATF_TP_ADD_TC(tp, msgsnd_failure);
 	ATF_TP_ADD_TC(tp, msgrcv_success);
 	ATF_TP_ADD_TC(tp, msgrcv_failure);
+
+	ATF_TP_ADD_TC(tp, msgctl_rmid_success);
+	ATF_TP_ADD_TC(tp, msgctl_rmid_failure);
+	ATF_TP_ADD_TC(tp, msgctl_stat_success);
+	ATF_TP_ADD_TC(tp, msgctl_stat_failure);
+	ATF_TP_ADD_TC(tp, msgctl_set_success);
+	ATF_TP_ADD_TC(tp, msgctl_set_failure);
 
 	return (atf_no_error());
 }

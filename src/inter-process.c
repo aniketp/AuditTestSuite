@@ -30,6 +30,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/shm.h>
+#include <sys/sem.h>
 #include <sys/stat.h>
 
 #include <atf-c.h>
@@ -45,7 +46,7 @@ typedef struct msgstr msgstr_t;
 static struct pollfd fds[1];
 static struct msqid_ds msgbuff;
 static struct shmid_ds shmbuff;
-static int msqid, shmid;
+static int msqid, shmid, semid;
 static char ipcregex[60];
 static ssize_t msgsize;
 
@@ -676,7 +677,7 @@ ATF_TC_HEAD(shmctl_illegal_command, tc)
 ATF_TC_BODY(shmctl_illegal_command, tc)
 {
 	shmid = shmget(IPC_PRIVATE, 10, IPC_CREAT | S_IRUSR);
-	
+
 	const char *regex = "shmctl.*illegal command.*failure : Invalid argument";
 	FILE *pipefd = setup(fds, "ip");
 	ATF_REQUIRE_EQ(-1, shmctl(shmid, -1, &shmbuff));
@@ -687,6 +688,103 @@ ATF_TC_BODY(shmctl_illegal_command, tc)
 }
 
 ATF_TC_CLEANUP(shmctl_illegal_command, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(semget_success);
+ATF_TC_HEAD(semget_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"semget(2) call");
+}
+
+ATF_TC_BODY(semget_success, tc)
+{
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE((semid = semget(IPC_PRIVATE, 1, IPC_CREAT | S_IRUSR)) != -1);
+	/* Check the presence of semaphore set ID in audit record */
+	snprintf(ipcregex, 60, "semget.*return,success,%d", semid);
+	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the semaphore set with ID = semid */
+	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+}
+
+ATF_TC_CLEANUP(semget_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(semget_failure);
+ATF_TC_HEAD(semget_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"semget(2) call");
+}
+
+ATF_TC_BODY(semget_failure, tc)
+{
+	const char *regex = "semget.*return,failure : No such file or directory";
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(-1, semget((key_t)(-1), 0, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(semget_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(semop_success);
+ATF_TC_HEAD(semop_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"semop(2) call");
+}
+
+ATF_TC_BODY(semop_success, tc)
+{
+	semid = semget(IPC_PRIVATE, 1, IPC_CREAT | S_IRUSR);
+
+	/* Initialize a sembuf structure to operate on semaphore set */
+	struct sembuf sop[1] = {{0, 1, 0}};
+	/* Check the presence of semaphore set ID in audit record */
+	snprintf(ipcregex, 60, "semop.*Semaphore IPC.*%d.*return,success", semid);
+
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(0, semop(semid, sop, 1));
+	check_audit(fds, ipcregex, pipefd);
+
+	/* Destroy the semaphore set with ID = semid */
+	ATF_REQUIRE_EQ(0, semctl(semid, 0, IPC_RMID));
+}
+
+ATF_TC_CLEANUP(semop_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(semop_failure);
+ATF_TC_HEAD(semop_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"semop(2) call");
+}
+
+ATF_TC_BODY(semop_failure, tc)
+{
+	const char *regex = "semop.*0xffff.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(-1, semop(-1, NULL, 0));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(semop_failure, tc)
 {
 	cleanup();
 }
@@ -723,6 +821,11 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, shmctl_set_success);
 	ATF_TP_ADD_TC(tp, shmctl_set_failure);
 	ATF_TP_ADD_TC(tp, shmctl_illegal_command);
+
+	ATF_TP_ADD_TC(tp, semget_success);
+	ATF_TP_ADD_TC(tp, semget_failure);
+	ATF_TP_ADD_TC(tp, semop_success);
+	ATF_TP_ADD_TC(tp, semop_failure);
 
 	return (atf_no_error());
 }

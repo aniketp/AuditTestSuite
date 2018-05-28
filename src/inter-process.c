@@ -42,27 +42,27 @@
 #include "utils.h"
 
 struct msgstr {
-	long int        mtype;
-	char            mtext[128];
+	long int	 mtype;
+	char		 mtext[128];
 };
 typedef struct msgstr msgstr_t;
 
 static union semun {
-	int              val;
-	struct semid_ds *buf;
-	unsigned short  *array;
+	int		 val;
+	struct semid_ds	*buf;
+	unsigned short 	*array;
 } arg;
 
+static int msqid, shmid, semid;
+static ssize_t msgsize;
+static mode_t mode = 0600;
 static struct pollfd fds[1];
 static struct msqid_ds msgbuff;
 static struct shmid_ds shmbuff;
 static struct semid_ds sembuff;
-static int msqid, shmid, semid;
 static char ipcregex[60];
-static unsigned short semvals[40];
-static ssize_t msgsize;
-static mode_t mode = 0600;
 static char path[20] = "/fileforaudit";
+static unsigned short semvals[40];
 
 
 ATF_TC_WITH_CLEANUP(msgget_success);
@@ -451,6 +451,7 @@ ATF_TC_BODY(shmat_success, tc)
 
 	FILE *pipefd = setup(fds, "ip");
 	ATF_REQUIRE((int)(addr = shmat(shmid, NULL, 0)) != -1);
+
 	/* Check the presence of shared memory ID and process address in record */
 	snprintf(ipcregex, 60, "shmat.*Shared Memory "
 			"IPC.*%d.*return,success,%d", shmid, (int)addr);
@@ -1467,6 +1468,51 @@ ATF_TC_CLEANUP(pipe_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(posix_openpt_success);
+ATF_TC_HEAD(posix_openpt_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"posix_openpt(2) call");
+}
+
+ATF_TC_BODY(posix_openpt_success, tc)
+{
+	int filedesc;
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE((filedesc = posix_openpt(O_RDWR)) != -1);
+	/* Check for the presence of filedesc in the audit record */
+	snprintf(ipcregex, 60, "posix_openpt.*return,success,%d", filedesc);
+	check_audit(fds, ipcregex, pipefd);
+	close(filedesc);
+}
+
+ATF_TC_CLEANUP(posix_openpt_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(posix_openpt_failure);
+ATF_TC_HEAD(posix_openpt_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"posix_openpt(2) call");
+}
+
+ATF_TC_BODY(posix_openpt_failure, tc)
+{
+	const char *regex = "posix_openpt.*return,failure : Invalid argument";
+	FILE *pipefd = setup(fds, "ip");
+	ATF_REQUIRE_EQ(-1, posix_openpt(-1));
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(posix_openpt_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, msgget_success);
@@ -1533,6 +1579,8 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, pipe_success);
 	ATF_TP_ADD_TC(tp, pipe_failure);
+	ATF_TP_ADD_TC(tp, posix_openpt_success);
+	ATF_TP_ADD_TC(tp, posix_openpt_failure);
 
 	return (atf_no_error());
 }

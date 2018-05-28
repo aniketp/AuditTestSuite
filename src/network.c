@@ -912,7 +912,7 @@ ATF_TC_BODY(recvfrom_success, tc)
 	ATF_REQUIRE((bytes_recv = recvfrom(clientfd, data, \
 		MAX_DATA, 0, (struct sockaddr *)&client, &len)) != 0);
 
-	/* Audit record must contain clientfd and bytes_sent */
+	/* Audit record must contain clientfd and bytes_recv */
 	snprintf(regex, 60, \
 		"recvfrom.*0x%x.*return,success,%zd", clientfd, bytes_recv);
 	check_audit(fds, regex, pipefd);

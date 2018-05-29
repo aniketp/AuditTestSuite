@@ -70,7 +70,7 @@ get_records(const char *auditregex, FILE *pipestream)
 	 */
 	while (bytes < reclen) {
 		if (au_fetch_tok(&token, buff + bytes, reclen - bytes) == -1)
-			printf("Incomplete Audit Record");
+			atf_tc_fail("Incomplete Audit Record");
 
 		/* Print the tokens as they are obtained, in the default form */
 		au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
@@ -84,10 +84,12 @@ get_records(const char *auditregex, FILE *pipestream)
 
 /*
  * Override the system-wide audit mask settings in /etc/security/audit_control
+ * and set the auditpipe's maximum allowed queue length limit
  */
 static void
 set_preselect_mode(int filedesc, au_mask_t *fmask)
 {
+	int qlimit_max;
 	int fmode = AUDITPIPE_PRESELECT_MODE_LOCAL;
 
 	/* Set local preselection mode for auditing */
@@ -100,6 +102,14 @@ set_preselect_mode(int filedesc, au_mask_t *fmask)
 
 	/* Set local preselection flag for non-attributable audit_events */
 	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_NAFLAGS, fmask) < 0)
+		atf_tc_fail("Preselection flag: %s", strerror(errno));
+
+	/* Query the maximum possible queue length limit for auditpipe */
+	if (ioctl(filedesc, AUDITPIPE_GET_QLIMIT_MAX, &qlimit_max) < 0)
+		atf_tc_fail("Preselection flag: %s", strerror(errno));
+
+	/* Set the queue length limit as obtained from previous step */
+	if (ioctl(filedesc, AUDITPIPE_SET_QLIMIT, &qlimit_max) < 0)
 		atf_tc_fail("Preselection flag: %s", strerror(errno));
 
 	/* This removes any outstanding record on the auditpipe */
@@ -191,17 +201,14 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
 FILE
 *setup(struct pollfd fd[], const char *name)
 {
-	au_mask_t fmask, aumask;
+	au_mask_t fmask;
 	fmask = get_audit_mask(name);
-	aumask = get_audit_mask("ad");
 	FILE *pipestream;
 
 	fd[0].fd = open("/dev/auditpipe", O_RDONLY);
 	fd[0].events = POLLIN;
 	pipestream = fdopen(fd[0].fd, "r");
 
-	/* Set local preselection parameters specific to "ad" audit_class */
-	set_preselect_mode(fd[0].fd, &aumask);
 	ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
 	{ service auditd onestart && touch started_auditd ; }"));
 

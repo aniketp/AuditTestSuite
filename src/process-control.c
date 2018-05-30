@@ -28,7 +28,9 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 
 #include <atf-c.h>
@@ -537,6 +539,148 @@ ATF_TC_CLEANUP(getresgid_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(setpriority_success);
+ATF_TC_HEAD(setpriority_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setpriority(2) call");
+}
+
+ATF_TC_BODY(setpriority_success, tc)
+{
+	int prio_value;
+	pid = getpid();
+	snprintf(pcregex, 60, "setpriority.*%d.*return,success", pid);
+	ATF_REQUIRE((prio_value = getpriority(PRIO_PROCESS, 0)) != -1);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setpriority(PRIO_PROCESS, 0, prio_value));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setpriority_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setpriority_failure);
+ATF_TC_HEAD(setpriority_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"setpriority(2) call");
+}
+
+ATF_TC_BODY(setpriority_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setpriority.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, setpriority(-1, -1, -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setpriority_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setgroups_success);
+ATF_TC_HEAD(setgroups_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setgroups(2) call");
+}
+
+ATF_TC_BODY(setgroups_success, tc)
+{
+	gid_t gidset;
+	pid = getpid();
+	snprintf(pcregex, 60, "setgroups.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setgroups(1, &gidset));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setgroups_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setgroups_failure);
+ATF_TC_HEAD(setgroups_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"setgroups(2) call");
+}
+
+ATF_TC_BODY(setgroups_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setgroups.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, setgroups(-1, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setgroups_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setpgrp_success);
+ATF_TC_HEAD(setpgrp_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setpgrp(2) call");
+}
+
+ATF_TC_BODY(setpgrp_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setpgrp.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	/* setpgrp(0, 0) does not change anything */
+	ATF_REQUIRE_EQ(0, setpgrp(0, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setpgrp_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setpgrp_failure);
+ATF_TC_HEAD(setpgrp_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"setpgrp(2) call");
+}
+
+ATF_TC_BODY(setpgrp_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setpgrp.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, setpgrp(-1, -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setpgrp_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(execve_success);
 ATF_TC_HEAD(execve_success, tc)
 {
@@ -809,6 +953,13 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, getresuid_failure);
 	ATF_TP_ADD_TC(tp, getresgid_success);
 	ATF_TP_ADD_TC(tp, getresgid_failure);
+
+	ATF_TP_ADD_TC(tp, setpriority_success);
+	ATF_TP_ADD_TC(tp, setpriority_failure);
+	ATF_TP_ADD_TC(tp, setgroups_success);
+	ATF_TP_ADD_TC(tp, setgroups_failure);
+	ATF_TP_ADD_TC(tp, setpgrp_success);
+	ATF_TP_ADD_TC(tp, setpgrp_failure);
 
 	ATF_TP_ADD_TC(tp, execve_success);
 	ATF_TP_ADD_TC(tp, execve_failure);

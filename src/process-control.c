@@ -27,6 +27,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 
@@ -646,6 +647,144 @@ ATF_TC_CLEANUP(fexecve_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(mlock_success);
+ATF_TC_HEAD(mlock_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"mlock(2) call");
+}
+
+ATF_TC_BODY(mlock_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "mlock.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, mlock(NULL, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(mlock_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(mlock_failure);
+ATF_TC_HEAD(mlock_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"mlock(2) call");
+}
+
+ATF_TC_BODY(mlock_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "mlock.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, mlock((void *)(-1), -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(mlock_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(munlock_success);
+ATF_TC_HEAD(munlock_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"munlock(2) call");
+}
+
+ATF_TC_BODY(munlock_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "munlock.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, munlock(NULL, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(munlock_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(munlock_failure);
+ATF_TC_HEAD(munlock_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"munlock(2) call");
+}
+
+ATF_TC_BODY(munlock_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "munlock.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, munlock((void *)(-1), -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(munlock_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(minherit_success);
+ATF_TC_HEAD(minherit_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"minherit(2) call");
+}
+
+ATF_TC_BODY(minherit_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "minherit.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, minherit(NULL, 0, INHERIT_ZERO));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(minherit_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(minherit_failure);
+ATF_TC_HEAD(minherit_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"minherit(2) call");
+}
+
+ATF_TC_BODY(minherit_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "minherit.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, minherit((void *)(-1), -1, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(minherit_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, chdir_success);
@@ -675,6 +814,13 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, execve_failure);
 	ATF_TP_ADD_TC(tp, fexecve_success);
 	ATF_TP_ADD_TC(tp, fexecve_failure);
+
+	ATF_TP_ADD_TC(tp, mlock_success);
+	ATF_TP_ADD_TC(tp, mlock_failure);
+	ATF_TP_ADD_TC(tp, munlock_success);
+	ATF_TP_ADD_TC(tp, munlock_failure);
+	ATF_TP_ADD_TC(tp, minherit_success);
+	ATF_TP_ADD_TC(tp, minherit_failure);
 
 	return (atf_no_error());
 }

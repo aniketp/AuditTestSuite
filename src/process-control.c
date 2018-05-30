@@ -634,28 +634,9 @@ ATF_TC_CLEANUP(setgroups_failure, tc)
 }
 
 
-ATF_TC_WITH_CLEANUP(setpgrp_success);
-ATF_TC_HEAD(setpgrp_success, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-					"setpgrp(2) call");
-}
-
-ATF_TC_BODY(setpgrp_success, tc)
-{
-	pid = getpid();
-	snprintf(pcregex, 60, "setpgrp.*%d.*return,success", pid);
-
-	FILE *pipefd = setup(fds, "pc");
-	/* setpgrp(0, 0) does not change anything */
-	ATF_REQUIRE_EQ(0, setpgrp(0, 0));
-	check_audit(fds, pcregex, pipefd);
-}
-
-ATF_TC_CLEANUP(setpgrp_success, tc)
-{
-	cleanup();
-}
+/*
+ * setpgrp(2) success case to be tested
+ */
 
 
 ATF_TC_WITH_CLEANUP(setpgrp_failure);
@@ -676,6 +657,54 @@ ATF_TC_BODY(setpgrp_failure, tc)
 }
 
 ATF_TC_CLEANUP(setpgrp_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setrlimit_success);
+ATF_TC_HEAD(setrlimit_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setrlimit(2) call");
+}
+
+ATF_TC_BODY(setrlimit_success, tc)
+{
+	struct rlimit rlp;
+	pid = getpid();
+	snprintf(pcregex, 60, "setrlimit.*%d.*return,success", pid);
+	ATF_REQUIRE_EQ(0, getrlimit(RLIMIT_FSIZE, &rlp));
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setrlimit(RLIMIT_FSIZE, &rlp));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setrlimit_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(setrlimit_failure);
+ATF_TC_HEAD(setrlimit_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"setrlimit(2) call");
+}
+
+ATF_TC_BODY(setrlimit_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setrlimit.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, setrlimit(RLIMIT_FSIZE, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setrlimit_failure, tc)
 {
 	cleanup();
 }
@@ -958,8 +987,10 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, setpriority_failure);
 	ATF_TP_ADD_TC(tp, setgroups_success);
 	ATF_TP_ADD_TC(tp, setgroups_failure);
-	ATF_TP_ADD_TC(tp, setpgrp_success);
+	/* ATF_TP_ADD_TC(tp, setpgrp_success); */
 	ATF_TP_ADD_TC(tp, setpgrp_failure);
+	ATF_TP_ADD_TC(tp, setrlimit_success);
+	ATF_TP_ADD_TC(tp, setrlimit_failure);
 
 	ATF_TP_ADD_TC(tp, execve_success);
 	ATF_TP_ADD_TC(tp, execve_failure);

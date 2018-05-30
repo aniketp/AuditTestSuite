@@ -26,6 +26,12 @@
  * $FreeBSD$
  */
 
+/*
+ * Note: open(2) and openat(2) have been tested in various combination of flags
+ * with O_CREAT being common since all of them are separate auditable events
+ * See: https://github.com/openbsm/openbsm/blob/master/etc/audit_event#L93
+ */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>

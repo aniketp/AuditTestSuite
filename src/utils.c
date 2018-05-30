@@ -102,15 +102,15 @@ set_preselect_mode(int filedesc, au_mask_t *fmask)
 
 	/* Set local preselection flag for non-attributable audit_events */
 	if (ioctl(filedesc, AUDITPIPE_SET_PRESELECT_NAFLAGS, fmask) < 0)
-		atf_tc_fail("Preselection flag: %s", strerror(errno));
+		atf_tc_fail("Preselection naflag: %s", strerror(errno));
 
 	/* Query the maximum possible queue length limit for auditpipe */
 	if (ioctl(filedesc, AUDITPIPE_GET_QLIMIT_MAX, &qlimit_max) < 0)
-		atf_tc_fail("Preselection flag: %s", strerror(errno));
+		atf_tc_fail("Query max-limit: %s", strerror(errno));
 
 	/* Set the queue length limit as obtained from previous step */
 	if (ioctl(filedesc, AUDITPIPE_SET_QLIMIT, &qlimit_max) < 0)
-		atf_tc_fail("Preselection flag: %s", strerror(errno));
+		atf_tc_fail("Set max-qlimit: %s", strerror(errno));
 
 	/* This removes any outstanding record on the auditpipe */
 	if (ioctl(filedesc, AUDITPIPE_FLUSH) < 0)

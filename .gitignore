@@ -6,4 +6,4 @@ CMakeLists.txt
 # Idea
 .idea
 
-sockets/temp
+.clang-format

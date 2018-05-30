@@ -30,6 +30,7 @@
 #include <sys/wait.h>
 
 #include <atf-c.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -37,6 +38,7 @@
 
 static pid_t pid;
 static int status;
+static int filedesc;
 static struct pollfd fds[1];
 static char bin[] = "/usr/bin/true";
 static char argument[] = "sample-argument";
@@ -97,10 +99,68 @@ ATF_TC_CLEANUP(execve_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(fexecve_success);
+ATF_TC_HEAD(fexecve_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fexecve(2) call");
+}
+
+ATF_TC_BODY(fexecve_success, tc)
+{
+	filedesc = open(bin, O_RDONLY | O_EXEC);
+	const char *regex = "fexecve.*sample-argument.*Unknown error: 201";
+	FILE *pipefd = setup(fds, "ex");
+
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+		check_audit(fds, regex, pipefd);
+	}
+	else
+		ATF_REQUIRE(fexecve(filedesc, arg, NULL) != -1);
+}
+
+ATF_TC_CLEANUP(fexecve_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fexecve_failure);
+ATF_TC_HEAD(fexecve_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fexecve(2) call");
+}
+
+ATF_TC_BODY(fexecve_failure, tc)
+{
+	filedesc = open(bin, O_RDONLY | O_EXEC);
+	const char *regex = "execve.*return,failure : Bad address";
+	FILE *pipefd = setup(fds, "ex");
+
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+		check_audit(fds, regex, pipefd);
+	}
+	else
+		ATF_REQUIRE_EQ(-1, fexecve(filedesc, arg, (char *const *)(-1)));
+}
+
+ATF_TC_CLEANUP(fexecve_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, execve_success);
 	ATF_TP_ADD_TC(tp, execve_failure);
+	ATF_TP_ADD_TC(tp, fexecve_success);
+	ATF_TP_ADD_TC(tp, fexecve_failure);
 
 	return (atf_no_error());
 }

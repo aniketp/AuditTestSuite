@@ -339,6 +339,7 @@ ATF_TC_BODY(setregid_success, tc)
 	snprintf(pcregex, 60, "setregid.*%d.*return,success", pid);
 
 	FILE *pipefd = setup(fds, "pc");
+	/* setregid(-1, -1) does not change any GIDs */
 	ATF_REQUIRE_EQ(0, setregid(-1, -1));
 	check_audit(fds, pcregex, pipefd);
 }
@@ -367,6 +368,7 @@ ATF_TC_BODY(setreuid_success, tc)
 	snprintf(pcregex, 60, "setreuid.*%d.*return,success", pid);
 
 	FILE *pipefd = setup(fds, "pc");
+	/* setreuid(-1, -1) does not change any UIDs */
 	ATF_REQUIRE_EQ(0, setreuid(-1, -1));
 	check_audit(fds, pcregex, pipefd);
 }
@@ -380,6 +382,158 @@ ATF_TC_CLEANUP(setreuid_success, tc)
  * setregid(2) fails only when the current user is not root. So no test case for
  * failure mode since the required_user="root"
  */
+
+
+ATF_TC_WITH_CLEANUP(setresuid_success);
+ATF_TC_HEAD(setresuid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setresuid(2) call");
+}
+
+ATF_TC_BODY(setresuid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setresuid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	/* setresuid(-1, -1, -1) does not change any UIDs */
+	ATF_REQUIRE_EQ(0, setresuid(-1, -1, -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setresuid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setresuid(2) fails only when the current user is not root. So no test case
+ * for failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(setresgid_success);
+ATF_TC_HEAD(setresgid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setresgid(2) call");
+}
+
+ATF_TC_BODY(setresgid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setresgid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	/* setresgid(-1, -1, -1) does not change any GIDs */
+	ATF_REQUIRE_EQ(0, setresgid(-1, -1, -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setresgid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setresgid(2) fails only when the current user is not root. So no test case
+ * for failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(getresuid_success);
+ATF_TC_HEAD(getresuid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"getresuid(2) call");
+}
+
+ATF_TC_BODY(getresuid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "getresuid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, getresuid(NULL, NULL, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(getresuid_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(getresuid_failure);
+ATF_TC_HEAD(getresuid_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"getresuid(2) call");
+}
+
+ATF_TC_BODY(getresuid_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "getresuid.*%d.*return,fail.*Bad address", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	/* Failure reason: Invalid address "-1" */
+	ATF_REQUIRE_EQ(-1, getresuid((uid_t *)-1, NULL, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(getresuid_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(getresgid_success);
+ATF_TC_HEAD(getresgid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"getresgid(2) call");
+}
+
+ATF_TC_BODY(getresgid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "getresgid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, getresgid(NULL, NULL, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(getresgid_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(getresgid_failure);
+ATF_TC_HEAD(getresgid_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"getresgid(2) call");
+}
+
+ATF_TC_BODY(getresgid_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "getresgid.*%d.*return,fail.*Bad address", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	/* Failure reason: Invalid address "-1" */
+	ATF_REQUIRE_EQ(-1, getresgid((gid_t *)-1, NULL, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(getresgid_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(execve_success);
@@ -509,6 +663,13 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, setreuid_success);
 	ATF_TP_ADD_TC(tp, setregid_success);
+	ATF_TP_ADD_TC(tp, setresuid_success);
+	ATF_TP_ADD_TC(tp, setresgid_success);
+
+	ATF_TP_ADD_TC(tp, getresuid_success);
+	ATF_TP_ADD_TC(tp, getresuid_failure);
+	ATF_TP_ADD_TC(tp, getresgid_success);
+	ATF_TP_ADD_TC(tp, getresgid_failure);
 
 	ATF_TP_ADD_TC(tp, execve_success);
 	ATF_TP_ADD_TC(tp, execve_failure);

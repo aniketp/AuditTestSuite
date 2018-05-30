@@ -61,19 +61,21 @@ get_records(const char *auditregex, FILE *pipestream)
 	 * available records from auditpipe which is passed to the functions
 	 * au_fetch_tok(3) and au_print_flags_tok(3) for further use.
 	 */
-	memstream = fmemopen(membuff, size, "w");
-	reclen = au_read_rec(pipestream, &buff);
+	ATF_REQUIRE((memstream = fmemopen(membuff, size, "w")) != NULL);
+	ATF_REQUIRE((reclen = au_read_rec(pipestream, &buff)) != -1);
 
 	/*
 	 * Iterate through each BSM token, extracting the bits that are
 	 * required to start processing the token sequences.
 	 */
 	while (bytes < reclen) {
-		if (au_fetch_tok(&token, buff + bytes, reclen - bytes) == -1)
+		if (au_fetch_tok(&token, buff + bytes, reclen - bytes) == -1) {
+			perror("au_read_rec");
 			atf_tc_fail("Incomplete Audit Record");
+		}
 
 		/* Print the tokens as they are obtained, in the default form */
-		au_print_flags_tok(memstream, &token, (char *)del, AU_OFLAG_NONE);
+		au_print_flags_tok(memstream, &token, del, AU_OFLAG_NONE);
 		bytes += token.len;
 	}
 
@@ -144,7 +146,7 @@ check_auditpipe(struct pollfd fd[], const char *auditregex, FILE *pipestream)
 
 	/* Set the expire time for poll(2) while waiting for syscall audit */
 	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &endtime));
-	endtime.tv_sec += 5;
+	endtime.tv_sec += 10;
 	timeout.tv_nsec = endtime.tv_nsec;
 
 	for (;;) {
@@ -176,7 +178,7 @@ check_auditpipe(struct pollfd fd[], const char *auditregex, FILE *pipestream)
 			break;
 
 		default:
-			atf_tc_fail("Poll returned an unknown event");
+			atf_tc_fail("Poll returned too many file descriptors");
 		}
 	}
 }
@@ -185,7 +187,7 @@ check_auditpipe(struct pollfd fd[], const char *auditregex, FILE *pipestream)
  * Wrapper functions around static "check_auditpipe"
  */
 static void
-check_audit_startup(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
+check_audit_startup(struct pollfd fd[], const char *auditrgx, FILE *pipestream){
 	check_auditpipe(fd, auditrgx, pipestream);
 }
 
@@ -201,14 +203,17 @@ check_audit(struct pollfd fd[], const char *auditrgx, FILE *pipestream) {
 FILE
 *setup(struct pollfd fd[], const char *name)
 {
-	au_mask_t fmask;
+	au_mask_t fmask, nomask;
 	fmask = get_audit_mask(name);
+	nomask = get_audit_mask("no");
 	FILE *pipestream;
 
 	fd[0].fd = open("/dev/auditpipe", O_RDONLY);
 	fd[0].events = POLLIN;
 	pipestream = fdopen(fd[0].fd, "r");
 
+	/* Set local preselection audit_class as "no" for audit startup */
+	set_preselect_mode(fd[0].fd, &nomask);
 	ATF_REQUIRE_EQ(0, system("service auditd onestatus || \
 	{ service auditd onestart && touch started_auditd ; }"));
 
@@ -224,6 +229,6 @@ FILE
 void
 cleanup(void)
 {
-	system("[ -f started_auditd ] && service auditd onestop > \
-		/dev/null 2>&1");
+	if (atf_utils_file_exists("started_auditd"))
+		system("service auditd onestop > /dev/null 2>&1");
 }

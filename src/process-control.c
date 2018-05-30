@@ -27,6 +27,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <atf-c.h>
@@ -36,6 +37,8 @@
 #include "utils.h"
 
 static pid_t pid;
+static int status;
+static int filedesc;
 static struct pollfd fds[1];
 static char pcregex[60];
 static char bin[] = "/usr/bin/true";
@@ -98,7 +101,6 @@ ATF_TC_HEAD(fchdir_success, tc)
 
 ATF_TC_BODY(fchdir_success, tc)
 {
-	int filedesc;
 	/* Build an absolute path to the test-case directory */
 	char dirpath[50];
 	ATF_REQUIRE(getcwd(dirpath, sizeof(dirpath)) != NULL);
@@ -175,7 +177,7 @@ ATF_TC_BODY(chroot_failure, tc)
 {
 	const char *regex = "chroot.*return,failure : Bad address";
 	FILE *pipefd = setup(fds, "pc");
-	ATF_REQUIRE_EQ(-1, chdir(NULL));
+	ATF_REQUIRE_EQ(-1, chroot(NULL));
 	check_audit(fds, regex, pipefd);
 }
 
@@ -183,6 +185,201 @@ ATF_TC_CLEANUP(chroot_failure, tc)
 {
 	cleanup();
 }
+
+
+ATF_TC_WITH_CLEANUP(umask_success);
+ATF_TC_HEAD(umask_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"umask(2) call");
+}
+
+ATF_TC_BODY(umask_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "umask.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	umask(0);
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(umask_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * umask(2) system call is always successful. So no test case for failure mode
+ */
+
+
+ATF_TC_WITH_CLEANUP(setuid_success);
+ATF_TC_HEAD(setuid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setuid(2) call");
+}
+
+ATF_TC_BODY(setuid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setuid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setuid(0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setuid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setuid(2) fails only when the current user is not root. So no test case for
+ * failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(seteuid_success);
+ATF_TC_HEAD(seteuid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"seteuid(2) call");
+}
+
+ATF_TC_BODY(seteuid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "seteuid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, seteuid(0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(seteuid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * seteuid(2) fails only when the current user is not root. So no test case for
+ * failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(setgid_success);
+ATF_TC_HEAD(setgid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setgid(2) call");
+}
+
+ATF_TC_BODY(setgid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setgid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setgid(0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setgid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setgid(2) fails only when the current user is not root. So no test case for
+ * failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(setegid_success);
+ATF_TC_HEAD(setegid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setegid(2) call");
+}
+
+ATF_TC_BODY(setegid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setegid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setegid(0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setegid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setegid(2) fails only when the current user is not root. So no test case for
+ * failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(setregid_success);
+ATF_TC_HEAD(setregid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setregid(2) call");
+}
+
+ATF_TC_BODY(setregid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setregid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setregid(-1, -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setregid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setregid(2) fails only when the current user is not root. So no test case for
+ * failure mode since the required_user="root"
+ */
+
+
+ATF_TC_WITH_CLEANUP(setreuid_success);
+ATF_TC_HEAD(setreuid_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setreuid(2) call");
+}
+
+ATF_TC_BODY(setreuid_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setreuid.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, setreuid(-1, -1));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setreuid_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * setregid(2) fails only when the current user is not root. So no test case for
+ * failure mode since the required_user="root"
+ */
 
 
 ATF_TC_WITH_CLEANUP(execve_success);
@@ -239,18 +436,84 @@ ATF_TC_CLEANUP(execve_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(fexecve_success);
+ATF_TC_HEAD(fexecve_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fexecve(2) call");
+}
+
+ATF_TC_BODY(fexecve_success, tc)
+{
+	filedesc = open(bin, O_RDONLY | O_EXEC);
+	const char *regex = "fexecve.*sample-argument.*Unknown error: 201";
+	FILE *pipefd = setup(fds, "pc");
+
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+		check_audit(fds, regex, pipefd);
+	}
+	else
+		ATF_REQUIRE(fexecve(filedesc, arg, NULL) != -1);
+}
+
+ATF_TC_CLEANUP(fexecve_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(fexecve_failure);
+ATF_TC_HEAD(fexecve_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"fexecve(2) call");
+}
+
+ATF_TC_BODY(fexecve_failure, tc)
+{
+	filedesc = open(bin, O_RDONLY | O_EXEC);
+	const char *regex = "execve.*return,failure : Bad address";
+	FILE *pipefd = setup(fds, "pc");
+
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+		check_audit(fds, regex, pipefd);
+	}
+	else
+		ATF_REQUIRE_EQ(-1, fexecve(filedesc, arg, (char *const *)(-1)));
+}
+
+ATF_TC_CLEANUP(fexecve_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, chdir_success);
 	ATF_TP_ADD_TC(tp, chdir_failure);
 	ATF_TP_ADD_TC(tp, fchdir_success);
 	ATF_TP_ADD_TC(tp, fchdir_failure);
-
 	ATF_TP_ADD_TC(tp, chroot_success);
 	ATF_TP_ADD_TC(tp, chroot_failure);
 
+	ATF_TP_ADD_TC(tp, umask_success);
+	ATF_TP_ADD_TC(tp, setuid_success);
+	ATF_TP_ADD_TC(tp, seteuid_success);
+	ATF_TP_ADD_TC(tp, setgid_success);
+	ATF_TP_ADD_TC(tp, setegid_success);
+
+	ATF_TP_ADD_TC(tp, setreuid_success);
+	ATF_TP_ADD_TC(tp, setregid_success);
+
 	ATF_TP_ADD_TC(tp, execve_success);
 	ATF_TP_ADD_TC(tp, execve_failure);
+	ATF_TP_ADD_TC(tp, fexecve_success);
+	ATF_TP_ADD_TC(tp, fexecve_failure);
 
 	return (atf_no_error());
 }

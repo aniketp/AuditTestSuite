@@ -35,6 +35,7 @@
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -47,6 +48,69 @@ static char pcregex[60];
 static char bin[] = "/usr/bin/true";
 static char argument[] = "sample-argument";
 static char *arg[] = {bin, argument, NULL};
+
+
+ATF_TC_WITH_CLEANUP(fork_success);
+ATF_TC_HEAD(fork_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"fork(2) call");
+}
+
+ATF_TC_BODY(fork_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "fork.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+		check_audit(fds, pcregex, pipefd);
+	}
+	else
+		exit(0);
+
+}
+
+ATF_TC_CLEANUP(fork_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * No fork(2) in failure mode since possibilities for failure are mostly
+ * in case user is not root.
+ */
+
+
+ATF_TC_WITH_CLEANUP(rfork_success);
+ATF_TC_HEAD(rfork_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"rfork(2) call");
+}
+
+ATF_TC_BODY(rfork_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "rfork.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE((pid = rfork(RFPROC)) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+		check_audit(fds, pcregex, pipefd);
+	}
+	else
+		exit(0);
+
+}
+
+ATF_TC_CLEANUP(rfork_success, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(chdir_success);
@@ -958,8 +1022,40 @@ ATF_TC_CLEANUP(minherit_failure, tc)
 }
 
 
+/*
+ * setlogin(2) cannot be tested in success mode since we don't want to change
+ * the login name of root user
+ */
+
+
+ATF_TC_WITH_CLEANUP(setlogin_failure);
+ATF_TC_HEAD(setlogin_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"setlogin(2) call");
+}
+
+ATF_TC_BODY(setlogin_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "setlogin.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, setlogin(NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setlogin_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, fork_success);
+	ATF_TP_ADD_TC(tp, rfork_success);
+
 	ATF_TP_ADD_TC(tp, chdir_success);
 	ATF_TP_ADD_TC(tp, chdir_failure);
 	ATF_TP_ADD_TC(tp, fchdir_success);
@@ -987,7 +1083,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, setpriority_failure);
 	ATF_TP_ADD_TC(tp, setgroups_success);
 	ATF_TP_ADD_TC(tp, setgroups_failure);
-	/* ATF_TP_ADD_TC(tp, setpgrp_success); */
+	/* ATF_TP_ADD_TC(tp, setpgrp_success); TBD */
 	ATF_TP_ADD_TC(tp, setpgrp_failure);
 	ATF_TP_ADD_TC(tp, setrlimit_success);
 	ATF_TP_ADD_TC(tp, setrlimit_failure);
@@ -1003,6 +1099,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, munlock_failure);
 	ATF_TP_ADD_TC(tp, minherit_success);
 	ATF_TP_ADD_TC(tp, minherit_failure);
+
+	ATF_TP_ADD_TC(tp, setlogin_failure);
 
 	return (atf_no_error());
 }

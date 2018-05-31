@@ -26,9 +26,13 @@
  * $FreeBSD$
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/uio.h>
+#include <sys/ktrace.h>
 #include <sys/mman.h>
+#include <sys/ptrace.h>
 #include <sys/resource.h>
+#include <sys/rtprio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -1051,6 +1055,193 @@ ATF_TC_CLEANUP(setlogin_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(rtprio_success);
+ATF_TC_HEAD(rtprio_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"rtprio(2) call");
+}
+
+ATF_TC_BODY(rtprio_success, tc)
+{
+	struct rtprio rtp;
+	pid = getpid();
+	snprintf(pcregex, 60, "rtprio.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, rtprio(RTP_LOOKUP, 0, &rtp));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(rtprio_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(rtprio_failure);
+ATF_TC_HEAD(rtprio_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"rtprio(2) call");
+}
+
+ATF_TC_BODY(rtprio_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "rtprio.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, rtprio(-1, -1, NULL));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(rtprio_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(profil_success);
+ATF_TC_HEAD(profil_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"profil(2) call");
+}
+
+ATF_TC_BODY(profil_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "profil.*%d.*return,success", pid);
+
+	char samples[20];
+	FILE *pipefd = setup(fds, "pc");
+	/* Set scale argument as 0 to disable profiling of current process */
+	ATF_REQUIRE_EQ(0, profil(samples, sizeof(samples), 0, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(profil_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(profil_failure);
+ATF_TC_HEAD(profil_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"profil(2) call");
+}
+
+ATF_TC_BODY(profil_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "profil.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, profil(NULL, 0, 0, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(profil_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(ptrace_success);
+ATF_TC_HEAD(ptrace_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"ptrace(2) call");
+}
+
+ATF_TC_BODY(ptrace_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "ptrace.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, ptrace(PT_TRACE_ME, 0, NULL, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(ptrace_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(ptrace_failure);
+ATF_TC_HEAD(ptrace_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"ptrace(2) call");
+}
+
+ATF_TC_BODY(ptrace_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "ptrace.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, ptrace(-1, 0, NULL, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(ptrace_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(ktrace_success);
+ATF_TC_HEAD(ktrace_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"ktrace(2) call");
+}
+
+ATF_TC_BODY(ktrace_success, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "ktrace.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(0, ktrace(NULL, KTROP_CLEAR, KTRFAC_SYSCALL, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(ktrace_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(ktrace_failure);
+ATF_TC_HEAD(ktrace_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"ktrace(2) call");
+}
+
+ATF_TC_BODY(ktrace_failure, tc)
+{
+	pid = getpid();
+	snprintf(pcregex, 60, "ktrace.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, "pc");
+	ATF_REQUIRE_EQ(-1, ktrace(NULL, -1, -1, 0));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(ktrace_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, fork_success);
@@ -1101,6 +1292,15 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, minherit_failure);
 
 	ATF_TP_ADD_TC(tp, setlogin_failure);
+	ATF_TP_ADD_TC(tp, rtprio_success);
+	ATF_TP_ADD_TC(tp, rtprio_failure);
+
+	ATF_TP_ADD_TC(tp, profil_success);
+	ATF_TP_ADD_TC(tp, profil_failure);
+	ATF_TP_ADD_TC(tp, ptrace_success);
+	ATF_TP_ADD_TC(tp, ptrace_failure);
+	ATF_TP_ADD_TC(tp, ktrace_success);
+	ATF_TP_ADD_TC(tp, ktrace_failure);
 
 	return (atf_no_error());
 }

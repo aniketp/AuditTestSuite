@@ -1,6 +1,5 @@
 /*-
  * Copyright 2018 Aniket Pandey
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,21 +25,27 @@
  * $FreeBSD$
  */
 
-#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <libutil.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include "utils.h"
 
+static pid_t pid;
 static struct pollfd fds[1];
 static mode_t mode = 0777;
 static char extregex[80];
 static struct stat statbuff;
+static const char *auclass = "cl";
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
 static const char *failurereg = "fileforaudit.*return,failure";
@@ -55,10 +60,13 @@ ATF_TC_HEAD(munmap_success, tc)
 
 ATF_TC_BODY(munmap_success, tc)
 {
+	pid = getpid();
+	snprintf(extregex, 60, "munmap.*%d.*return,failure", pid);
+
+	/* Allocate sample memory, to be removed by munmap(2) */
 	int pagesize = sysconf(_SC_PAGESIZE);
-	const char *regex = "munmap.*return,success";
 	char *addr = mmap(NULL, 4 * pagesize, PROT_READ , MAP_ANONYMOUS, -1, 0);
-	FILE *pipefd = setup(fds, "cl");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, munmap(addr, pagesize));
 	check_audit(fds, regex, pipefd);
 }
@@ -79,7 +87,7 @@ ATF_TC_HEAD(munmap_failure, tc)
 ATF_TC_BODY(munmap_failure, tc)
 {
 	const char *regex = "munmap.*return,failure : Invalid argument";
-	FILE *pipefd = setup(fds, "cl");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, munmap((void *)SIZE_MAX, -1));
 	check_audit(fds, regex, pipefd);
 }
@@ -104,7 +112,7 @@ ATF_TC_BODY(close_success, tc)
 	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
 	/* Call stat(2) to store the Inode number of 'path' */
 	ATF_REQUIRE_EQ(0, stat(path, &statbuff));
-	FILE *pipefd = setup(fds, "cl");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, close(filedesc));
 
 	snprintf(extregex, 80, "close.*%lu.*return,success", statbuff.st_ino);
@@ -127,13 +135,44 @@ ATF_TC_HEAD(close_failure, tc)
 ATF_TC_BODY(close_failure, tc)
 {
 	const char *regex = "close.*return,failure";
-	FILE *pipefd = setup(fds, "cl");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: file does not exist */
 	ATF_REQUIRE_EQ(-1, close(-1));
 	check_audit(fds, regex, pipefd);
 }
 
 ATF_TC_CLEANUP(close_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(revoke_success);
+ATF_TC_HEAD(revoke_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"revoke(2) call");
+}
+
+ATF_TC_BODY(revoke_success, tc)
+{
+	int master, slave;
+	char *ptyname;
+	pid = getpid();
+	snprintf(extregex, 60, "revoke.*%d.*return,success", pid);
+
+	/* Obtain a pseudo terminal device */
+	ATF_REQUIRE_EQ(0, openpty(&master, &slave, ptyname, NULL, NULL));
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, revoke(ptyname));
+	check_audit(fds, extregex, pipefd);
+
+	/* Close all file descriptors */
+	ATF_REQUIRE_EQ(0, close(master));
+	ATF_REQUIRE_EQ(0, close(slave));
+}
+
+ATF_TC_CLEANUP(revoke_success, tc)
 {
 	cleanup();
 }
@@ -148,7 +187,7 @@ ATF_TC_HEAD(revoke_failure, tc)
 
 ATF_TC_BODY(revoke_failure, tc)
 {
-	FILE *pipefd = setup(fds, "cl");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: file does not exist */
 	ATF_REQUIRE_EQ(-1, revoke(errpath));
 	check_audit(fds, failurereg, pipefd);
@@ -164,8 +203,11 @@ ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, munmap_success);
 	ATF_TP_ADD_TC(tp, munmap_failure);
+
 	ATF_TP_ADD_TC(tp, close_success);
 	ATF_TP_ADD_TC(tp, close_failure);
+
+	ATF_TP_ADD_TC(tp, revoke_success);
 	ATF_TP_ADD_TC(tp, revoke_failure);
 
 	return (atf_no_error());

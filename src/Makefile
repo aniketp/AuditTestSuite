@@ -14,6 +14,7 @@ ATF_TESTS_C+=	ioctl
 ATF_TESTS_C+=	network
 ATF_TESTS_C+=	inter-process
 ATF_TESTS_C+=	process-control
+ATF_TESTS_C+=	administrative
 
 SRCS.file-create+=	file-create.c
 SRCS.file-create+=	utils.c
@@ -39,6 +40,8 @@ SRCS.inter-process+=	inter-process.c
 SRCS.inter-process+=	utils.c
 SRCS.process-control+=	process-control.c
 SRCS.process-control+=	utils.c
+SRCS.administrative+=	administrative.c
+SRCS.administrative+=	utils.c
 
 TEST_METADATA+= timeout="30"
 TEST_METADATA+= required_user="root"

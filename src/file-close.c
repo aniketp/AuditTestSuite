@@ -25,17 +25,14 @@
  * $FreeBSD$
  */
 
-#include <sys/types.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
-#include <libutil.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <termios.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -61,14 +58,13 @@ ATF_TC_HEAD(munmap_success, tc)
 ATF_TC_BODY(munmap_success, tc)
 {
 	pid = getpid();
-	snprintf(extregex, 60, "munmap.*%d.*return,failure", pid);
+	snprintf(extregex, sizeof(extregex), "munmap.*%d.*return,success", pid);
 
 	/* Allocate sample memory, to be removed by munmap(2) */
-	int pagesize = sysconf(_SC_PAGESIZE);
-	char *addr = mmap(NULL, 4 * pagesize, PROT_READ , MAP_ANONYMOUS, -1, 0);
+	char *addr = mmap(NULL, sizeof(char), PROT_READ , MAP_ANONYMOUS, -1, 0);
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, munmap(addr, pagesize));
-	check_audit(fds, regex, pipefd);
+	ATF_REQUIRE_EQ(0, munmap(addr, sizeof(char)));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(munmap_success, tc)
@@ -115,7 +111,8 @@ ATF_TC_BODY(close_success, tc)
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, close(filedesc));
 
-	snprintf(extregex, 80, "close.*%lu.*return,success", statbuff.st_ino);
+	snprintf(extregex,
+		sizeof(extregex), "close.*%llu.*return,succes", statbuff.st_ino);
 	check_audit(fds, extregex, pipefd);
 }
 
@@ -147,6 +144,28 @@ ATF_TC_CLEANUP(close_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(closefrom_success);
+ATF_TC_HEAD(closefrom_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"closefrom(2) call");
+}
+
+ATF_TC_BODY(closefrom_success, tc)
+{
+	const char *regex = "closefrom.*return,success";
+	FILE *pipefd = setup(fds, auclass);
+	/* closefrom(2) returns 'void' */
+	closefrom(INT_MAX);
+	check_audit(fds, regex, pipefd);
+}
+
+ATF_TC_CLEANUP(closefrom_success, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(revoke_success);
 ATF_TC_HEAD(revoke_success, tc)
 {
@@ -156,20 +175,21 @@ ATF_TC_HEAD(revoke_success, tc)
 
 ATF_TC_BODY(revoke_success, tc)
 {
-	int master, slave;
+	int filedesc;
 	char *ptyname;
 	pid = getpid();
-	snprintf(extregex, 60, "revoke.*%d.*return,success", pid);
+	snprintf(extregex, sizeof(extregex), "revoke.*%d.*return,success", pid);
 
-	/* Obtain a pseudo terminal device */
-	ATF_REQUIRE_EQ(0, openpty(&master, &slave, ptyname, NULL, NULL));
+	/* Obtain a pseudo terminal and get the path to slave device */
+	ATF_REQUIRE((filedesc = posix_openpt(O_RDWR | O_NOCTTY)) != -1);
+	ATF_REQUIRE((ptyname = ptsname(filedesc)) != NULL);
+
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, revoke(ptyname));
 	check_audit(fds, extregex, pipefd);
 
-	/* Close all file descriptors */
-	ATF_REQUIRE_EQ(0, close(master));
-	ATF_REQUIRE_EQ(0, close(slave));
+	/* Close the file descriptor to pseudo terminal */
+	ATF_REQUIRE_EQ(0, close(filedesc));
 }
 
 ATF_TC_CLEANUP(revoke_success, tc)
@@ -206,6 +226,7 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, close_success);
 	ATF_TP_ADD_TC(tp, close_failure);
+	ATF_TP_ADD_TC(tp, closefrom_success);
 
 	ATF_TP_ADD_TC(tp, revoke_success);
 	ATF_TP_ADD_TC(tp, revoke_failure);

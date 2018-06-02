@@ -1479,7 +1479,7 @@ ATF_TC_BODY(posix_openpt_success, tc)
 {
 	int filedesc;
 	FILE *pipefd = setup(fds, "ip");
-	ATF_REQUIRE((filedesc = posix_openpt(O_RDWR)) != -1);
+	ATF_REQUIRE((filedesc = posix_openpt(O_RDWR | O_NOCTTY)) != -1);
 	/* Check for the presence of filedesc in the audit record */
 	snprintf(ipcregex, 60, "posix_openpt.*return,success,%d", filedesc);
 	check_audit(fds, ipcregex, pipefd);

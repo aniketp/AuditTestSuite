@@ -111,8 +111,9 @@ ATF_TC_BODY(close_success, tc)
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, close(filedesc));
 
-	snprintf(extregex,
-		sizeof(extregex), "close.*%llu.*return,succes", statbuff.st_ino);
+	/* intmax_t to support both i386 and amd64 architectures */
+	snprintf(extregex, sizeof(extregex), "close.*%jd.*return,succes",
+			(intmax_t)statbuff.st_ino);
 	check_audit(fds, extregex, pipefd);
 }
 

@@ -10,6 +10,7 @@ ATF_TESTS_C+=	file-close
 ATF_TESTS_C+=	file-attribute-access
 ATF_TESTS_C+=	file-attribute-modify
 ATF_TESTS_C+=	exec
+ATF_TESTS_C+=	open
 ATF_TESTS_C+=	ioctl
 ATF_TESTS_C+=	network
 ATF_TESTS_C+=	inter-process
@@ -32,6 +33,8 @@ SRCS.file-attribute-modify+=	file-attribute-modify.c
 SRCS.file-attribute-modify+=	utils.c
 SRCS.exec+=	exec.c
 SRCS.exec+=	utils.c
+SRCS.open+=	open.c
+SRCS.open+=	utils.c
 SRCS.ioctl+=	ioctl.c
 SRCS.ioctl+=	utils.c
 SRCS.network+=	network.c
@@ -48,7 +51,6 @@ TEST_METADATA+= required_user="root"
 
 WARNS?=	6
 
-CFLAGS+=	-I${.CURDIR:H:H}
-LDFLAGS+=	-lbsm
+LDFLAGS+=	-lbsm -lutil
 
 .include <bsd.test.mk>

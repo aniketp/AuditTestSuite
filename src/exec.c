@@ -1,6 +1,5 @@
 /*-
- * Copyright 2018 Aniket Pandey
- * All rights reserved.
+ * Copyright (c) 2018 Aniket Pandey
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,6 +53,13 @@ ATF_TC_HEAD(execve_success, tc)
 
 ATF_TC_BODY(execve_success, tc)
 {
+	/*
+	 * execve(2) overlays the calling process in successful invocation.
+	 * Hence, audit(4) does not get any return value in the event token
+	 * for execve(2) due to which, it simply places "BSM_ERRNO_UNKNOWN"
+	 * as the "ar->ar_errno" field.
+	 * Please see: sys/security/audit/bsm_errno.c#L728
+	 */
 	const char *regex = "execve.*sample-argument.*Unknown error: 201";
 	FILE *pipefd = setup(fds, "ex");
 
@@ -109,6 +115,14 @@ ATF_TC_HEAD(fexecve_success, tc)
 ATF_TC_BODY(fexecve_success, tc)
 {
 	filedesc = open(bin, O_RDONLY | O_EXEC);
+
+	/*
+	 * fexecve(2) overlays the calling process in successful invocation.
+	 * Hence, audit(4) does not get any return value in the event token
+	 * for fexecve(2) due to which, it simply places "BSM_ERRNO_UNKNOWN"
+	 * as the "ar->ar_errno" field.
+	 * Please see: sys/security/audit/bsm_errno.c#L728
+	 */
 	const char *regex = "fexecve.*sample-argument.*Unknown error: 201";
 	FILE *pipefd = setup(fds, "ex");
 
@@ -119,6 +133,9 @@ ATF_TC_BODY(fexecve_success, tc)
 	}
 	else
 		ATF_REQUIRE(fexecve(filedesc, arg, NULL) != -1);
+
+	/* Close the file descriptor of the executable */
+	ATF_REQUIRE_EQ(0, close(filedesc));
 }
 
 ATF_TC_CLEANUP(fexecve_success, tc)
@@ -147,6 +164,9 @@ ATF_TC_BODY(fexecve_failure, tc)
 	}
 	else
 		ATF_REQUIRE_EQ(-1, fexecve(filedesc, arg, (char *const *)(-1)));
+
+	/* Close the file descriptor of the executable */
+	ATF_REQUIRE_EQ(0, close(filedesc));
 }
 
 ATF_TC_CLEANUP(fexecve_failure, tc)

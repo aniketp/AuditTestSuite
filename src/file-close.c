@@ -1,5 +1,5 @@
 /*-
- * Copyright 2018 Aniket Pandey
+ * Copyright (c) 2018 Aniket Pandey
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

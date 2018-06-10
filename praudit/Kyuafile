@@ -1,7 +1,0 @@
--- $FreeBSD$
-
-syntax(2)
-
-test_suite('FreeBSD')
-
-atf_test_program{name='praudit_test'}

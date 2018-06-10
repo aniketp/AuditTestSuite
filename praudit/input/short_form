@@ -1,0 +1,4 @@
+header,56,11,AUE_audit_startup,0,Sun Jun 10 16:46:47 2018, + 241 msec
+text,auditd::Audit startup
+return,success,0
+trailer,56

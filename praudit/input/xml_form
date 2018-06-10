@@ -1,0 +1,9 @@
+<?xml version='1.0' ?>
+<audit>
+<record version="11" event="audit startup" modifier="0" time="Sun Jun 10 16:46:47 2018" msec=" + 241 msec" >
+<text>auditd::Audit startup</text>
+<return errval="success" retval="0" />
+</record>
+<?xml version='1.0' ?>
+<audit>
+</audit>

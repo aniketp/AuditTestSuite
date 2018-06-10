@@ -1,4 +1,3 @@
-#! /usr/libexec/atf-sh
 #
 # Copyright (c) 2018 Aniket Pandey
 #
@@ -54,10 +53,6 @@ praudit_body()
 	# Check that praudit outputs the trail in same line with "-l" flag
 	atf_check -s exit:1 -o file:"$input_dir"/same_line \
 			praudit -l "$input_dir"/trail
-
-	# Check that praudit outputs the short form with "-s" flag
-	atf_check -s exit:1 -o file:"$input_dir"/short_form \
-			praudit -s "$input_dir"/trail
 
 	# Check that praudit outputs the short form with "-s" flag
 	atf_check -s exit:1 -o file:"$input_dir"/short_form \

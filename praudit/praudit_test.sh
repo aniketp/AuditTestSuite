@@ -26,43 +26,122 @@
 #
 
 
-atf_test_case praudit
-praudit_body()
+atf_test_case praudit_delim_comma
+praudit_delim_comma_head()
 {
-	# Check that comma delimiter is present with -d "," cmd
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/del_comma \
-			praudit -d "," $(atf_get_srcdir)/trail
-
-	# Check that underscore delimiter is present with -d "_" cmd
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/del_underscore \
-			praudit -d "_" $(atf_get_srcdir)/trail
-
-	# Check that praudit outputs default form without arguments
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/no_args \
-			praudit $(atf_get_srcdir)/trail
-
-	# Check that praudit outputs the numeric form with "-n" flag
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/numeric_form \
-			praudit -n $(atf_get_srcdir)/trail
-
-	# Check that praudit outputs the raw form with "-r" flag
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/raw_form \
-			praudit -r $(atf_get_srcdir)/trail
-
-	# Check that praudit outputs the trail in same line with "-l" flag
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/same_line \
-			praudit -l $(atf_get_srcdir)/trail
-
-	# Check that praudit outputs the short form with "-s" flag
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/short_form \
-			praudit -s $(atf_get_srcdir)/trail
-
-	# Check that praudit outputs the XML file with "-x" flag
-	atf_check -s exit:1 -o file:$(atf_get_srcdir)/xml_form \
-			praudit -x $(atf_get_srcdir)/trail
+	atf_set "descr" "Verify that comma delimiter is present with -d ',' cmd"
 }
+
+praudit_delim_comma_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/del_comma \
+		praudit -d "," $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_delim_underscore
+praudit_delim_underscore_head()
+{
+	atf_set "descr" "Verify that underscore delimiter is present with -d _"
+}
+
+praudit_delim_underscore_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/del_underscore \
+		praudit -d "_" $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_no_args
+praudit_no_args_head()
+{
+	atf_set "descr" "Verify that praudit outputs default form without "
+			"any arguments"
+}
+
+praudit_no_args_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/no_args \
+		praudit $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_numeric_form
+praudit_numeric_form_head()
+{
+	atf_set "descr" "Verify that praudit outputs the numeric form "
+			"with -n flag"
+}
+
+praudit_numeric_form_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/numeric_form \
+		praudit -n $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_raw_form
+praudit_raw_form_head()
+{
+	atf_set "descr" "Verify that praudit outputs the raw form with -r flag"
+}
+
+praudit_raw_form_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/raw_form \
+		praudit -r $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_same_line
+praudit_same_line_head()
+{
+	atf_set "descr" "Verify that praudit outputs the trail in the same "
+			"line  with -l flag"
+}
+
+praudit_same_line_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/same_line \
+		praudit -l $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_short_form
+praudit_short_form_head()
+{
+	atf_set "descr" "Verify that praudit outputs the short form "
+			"with -s flag"
+}
+
+praudit_short_form_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/short_form \
+		praudit -s $(atf_get_srcdir)/trail
+}
+
+
+atf_test_case praudit_xml_form
+praudit_xml_form_head()
+{
+	atf_set "descr" "Verify that praudit outputs the XML file with -x flag"
+}
+
+praudit_xml_form_body()
+{
+	atf_check -o file:$(atf_get_srcdir)/xml_form \
+		praudit -x $(atf_get_srcdir)/trail
+}
+
 
 atf_init_test_cases()
 {
-	atf_add_test_case praudit
+	atf_add_test_case praudit_delim_comma
+	atf_add_test_case praudit_delim_underscore
+	atf_add_test_case praudit_no_args
+	atf_add_test_case praudit_numeric_form
+	atf_add_test_case praudit_raw_form
+	atf_add_test_case praudit_same_line
+	atf_add_test_case praudit_short_form
+	atf_add_test_case praudit_xml_form
 }

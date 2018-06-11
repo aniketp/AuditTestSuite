@@ -15,6 +15,6 @@ ${PACKAGE}FILES+=			\
 		input/raw_form 		\
 		input/same_line 	\
 		input/short_form 	\
-		input/xml_form 		\
+		input/xml_form
 
 .include <bsd.test.mk>

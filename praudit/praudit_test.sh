@@ -55,7 +55,7 @@ praudit_delim_underscore_body()
 atf_test_case praudit_no_args
 praudit_no_args_head()
 {
-	atf_set "descr" "Verify that praudit outputs default form without "
+	atf_set "descr" "Verify that praudit outputs default form without " \
 			"any arguments"
 }
 
@@ -69,7 +69,7 @@ praudit_no_args_body()
 atf_test_case praudit_numeric_form
 praudit_numeric_form_head()
 {
-	atf_set "descr" "Verify that praudit outputs the numeric form "
+	atf_set "descr" "Verify that praudit outputs the numeric form " \
 			"with -n flag"
 }
 
@@ -96,7 +96,7 @@ praudit_raw_form_body()
 atf_test_case praudit_same_line
 praudit_same_line_head()
 {
-	atf_set "descr" "Verify that praudit outputs the trail in the same "
+	atf_set "descr" "Verify that praudit outputs the trail in the same " \
 			"line  with -l flag"
 }
 
@@ -110,7 +110,7 @@ praudit_same_line_body()
 atf_test_case praudit_short_form
 praudit_short_form_head()
 {
-	atf_set "descr" "Verify that praudit outputs the short form "
+	atf_set "descr" "Verify that praudit outputs the short form " \
 			"with -s flag"
 }
 
@@ -134,6 +134,20 @@ praudit_xml_form_body()
 }
 
 
+atf_test_case praudit_raw_short_exclusive
+praudit_raw_short_exclusive_head()
+{
+	atf_set "descr" "Verify that praudit outputs on stderr when both " \
+			"raw and short form are specified"
+}
+
+praudit_raw_short_exclusive_body()
+{
+	atf_check -s exit:1 -e match:"usage: praudit" \
+		praudit -rs $(atf_get_srcdir)/trail
+}
+
+
 atf_init_test_cases()
 {
 	atf_add_test_case praudit_delim_comma
@@ -144,4 +158,5 @@ atf_init_test_cases()
 	atf_add_test_case praudit_same_line
 	atf_add_test_case praudit_short_form
 	atf_add_test_case praudit_xml_form
+	atf_add_test_case praudit_raw_short_exclusive
 }

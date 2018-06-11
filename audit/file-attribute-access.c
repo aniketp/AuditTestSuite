@@ -42,11 +42,13 @@
 #include "utils.h"
 
 static struct pollfd fds[1];
+static pid_t pid;
 static fhandle_t fht;
 static mode_t mode = 0777;
 static char extregex[80];
 static struct stat statbuff;
 static struct statfs statfsbuff;
+static const char *auclass = "fa";
 static const char *name = "authorname";
 static const char *path = "fileforaudit";
 static const char *errpath = "dirdoesnotexist/fileforaudit";
@@ -65,7 +67,7 @@ ATF_TC_BODY(stat_success, tc)
 {
 	/* File needs to exist to call stat(2) */
 	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, stat(path, &statbuff));
 	check_audit(fds, successreg, pipefd);
 }
@@ -85,7 +87,7 @@ ATF_TC_HEAD(stat_failure, tc)
 
 ATF_TC_BODY(stat_failure, tc)
 {
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: file does not exist */
 	ATF_REQUIRE_EQ(-1, stat(errpath, &statbuff));
 	check_audit(fds, failurereg, pipefd);
@@ -108,7 +110,7 @@ ATF_TC_BODY(lstat_success, tc)
 {
 	/* Symbolic link needs to exist to call lstat(2) */
 	ATF_REQUIRE_EQ(0, symlink("symlink", path));
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, lstat(path, &statbuff));
 	check_audit(fds, successreg, pipefd);
 }
@@ -128,7 +130,7 @@ ATF_TC_HEAD(lstat_failure, tc)
 
 ATF_TC_BODY(lstat_failure, tc)
 {
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: symbolic link does not exist */
 	ATF_REQUIRE_EQ(-1, lstat(errpath, &statbuff));
 	check_audit(fds, failurereg, pipefd);
@@ -150,15 +152,14 @@ ATF_TC_HEAD(fstat_success, tc)
 ATF_TC_BODY(fstat_success, tc)
 {
 	int filedesc;
-	char regex[30];
-
 	/* File needs to exist to call fstat(2) */
 	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, fstat(filedesc, &statbuff));
 
-	snprintf(regex, 30, "fstat.*%lu.*return,success", statbuff.st_ino);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex),
+		"fstat.*%jd.*return,success", (intmax_t)statbuff.st_ino);
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(fstat_success, tc)
@@ -176,7 +177,7 @@ ATF_TC_HEAD(fstat_failure, tc)
 
 ATF_TC_BODY(fstat_failure, tc)
 {
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	const char *regex = "fstat.*return,failure : Bad file descriptor";
 	/* Failure reason: bad file descriptor */
 	ATF_REQUIRE_EQ(-1, fstat(-1, &statbuff));
@@ -200,8 +201,8 @@ ATF_TC_BODY(fstatat_success, tc)
 {
 	/* File or Symbolic link needs to exist to call lstat(2) */
 	ATF_REQUIRE_EQ(0, symlink("symlink", path));
-	FILE *pipefd = setup(fds, "fa");
-	ATF_REQUIRE_EQ(0, fstatat(AT_FDCWD, path, &statbuff, \
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, fstatat(AT_FDCWD, path, &statbuff,
 		AT_SYMLINK_NOFOLLOW));
 	check_audit(fds, successreg, pipefd);
 }
@@ -221,9 +222,9 @@ ATF_TC_HEAD(fstatat_failure, tc)
 
 ATF_TC_BODY(fstatat_failure, tc)
 {
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: symbolic link does not exist */
-	ATF_REQUIRE_EQ(-1, fstatat(AT_FDCWD, path, &statbuff, \
+	ATF_REQUIRE_EQ(-1, fstatat(AT_FDCWD, path, &statbuff,
 		AT_SYMLINK_NOFOLLOW));
 	check_audit(fds, failurereg, pipefd);
 }
@@ -245,7 +246,7 @@ ATF_TC_BODY(statfs_success, tc)
 {
 	/* File needs to exist to call statfs(2) */
 	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, statfs(path, &statfsbuff));
 	check_audit(fds, successreg, pipefd);
 }
@@ -265,7 +266,7 @@ ATF_TC_HEAD(statfs_failure, tc)
 
 ATF_TC_BODY(statfs_failure, tc)
 {
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: file does not exist */
 	ATF_REQUIRE_EQ(-1, statfs(errpath, &statfsbuff));
 	check_audit(fds, failurereg, pipefd);
@@ -287,17 +288,16 @@ ATF_TC_HEAD(fstatfs_success, tc)
 ATF_TC_BODY(fstatfs_success, tc)
 {
 	int filedesc;
-	char regex[30];
-
 	/* File needs to exist to call fstat(2) */
 	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
 	/* Call stat(2) to store the Inode number of 'path' */
 	ATF_REQUIRE_EQ(0, stat(path, &statbuff));
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, fstatfs(filedesc, &statfsbuff));
 
-	snprintf(regex, 30, "fstatfs.*%lu.*return,success", statbuff.st_ino);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "fstatfs.*%jd.*return,success",
+			(intmax_t)statbuff.st_ino);
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(fstatfs_success, tc)
@@ -315,7 +315,7 @@ ATF_TC_HEAD(fstatfs_failure, tc)
 
 ATF_TC_BODY(fstatfs_failure, tc)
 {
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	const char *regex = "fstatfs.*return,failure : Bad file descriptor";
 	/* Failure reason: bad file descriptor */
 	ATF_REQUIRE_EQ(-1, fstatfs(-1, &statfsbuff));
@@ -337,10 +337,12 @@ ATF_TC_HEAD(getfsstat_success, tc)
 
 ATF_TC_BODY(getfsstat_success, tc)
 {
-	const char *regex = "getfsstat.*return,success";
-	FILE *pipefd = setup(fds, "fa");
+	pid = getpid();
+	snprintf(extregex, sizeof(extregex), "getfsstat.*%d.*success", pid);
+
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE(getfsstat(NULL, 0, MNT_NOWAIT) != -1);
-	check_audit(fds, regex, pipefd);
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(getfsstat_success, tc)
@@ -359,7 +361,7 @@ ATF_TC_HEAD(getfsstat_failure, tc)
 ATF_TC_BODY(getfsstat_failure, tc)
 {
 	const char *regex = "getfsstat.*return,failure : Invalid argument";
-	FILE *pipefd = setup(fds, "fa");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid value for mode */
 	ATF_REQUIRE_EQ(-1, getfsstat(NULL, 0, -1));
 	check_audit(fds, regex, pipefd);

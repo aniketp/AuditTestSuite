@@ -134,11 +134,28 @@ praudit_xml_form_body()
 }
 
 
+atf_test_case praudit_sync_to_next_record
+praudit_sync_to_next_record_head()
+{
+	atf_set "descr" "Verify that stdout is empty on normal praudit " \
+			"command but it prints out the last segment of " \
+			"trail which is not corrupted with -p flag on. "
+}
+
+praudit_sync_to_next_record_body()
+{
+	# default -s exit:0 -o empty
+	atf_check praudit $(atf_get_srcdir)/corrupted
+	atf_check -o file:$(atf_get_srcdir)/no_args \
+		praudit -p $(atf_get_srcdir)/corrupted
+}
+
+
 atf_test_case praudit_raw_short_exclusive
 praudit_raw_short_exclusive_head()
 {
-	atf_set "descr" "Verify that praudit outputs on stderr when both " \
-			"raw and short form are specified"
+	atf_set "descr" "Verify that praudit outputs usage message on stderr " \
+			"when both raw and short options are specified"
 }
 
 praudit_raw_short_exclusive_body()
@@ -158,5 +175,6 @@ atf_init_test_cases()
 	atf_add_test_case praudit_same_line
 	atf_add_test_case praudit_short_form
 	atf_add_test_case praudit_xml_form
+	atf_add_test_case praudit_sync_to_next_record
 	atf_add_test_case praudit_raw_short_exclusive
 }

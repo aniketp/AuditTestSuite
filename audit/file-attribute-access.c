@@ -25,13 +25,12 @@
  * $FreeBSD$
  */
 
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/param.h>
+#include <sys/extattr.h>
 #include <sys/ucred.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
-#include <sys/extattr.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
@@ -66,10 +65,11 @@ ATF_TC_HEAD(stat_success, tc)
 ATF_TC_BODY(stat_success, tc)
 {
 	/* File needs to exist to call stat(2) */
-	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, stat(path, &statbuff));
 	check_audit(fds, successreg, pipefd);
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(stat_success, tc)
@@ -151,7 +151,6 @@ ATF_TC_HEAD(fstat_success, tc)
 
 ATF_TC_BODY(fstat_success, tc)
 {
-	int filedesc;
 	/* File needs to exist to call fstat(2) */
 	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
 	FILE *pipefd = setup(fds, auclass);
@@ -160,6 +159,7 @@ ATF_TC_BODY(fstat_success, tc)
 	snprintf(extregex, sizeof(extregex),
 		"fstat.*%jd.*return,success", (intmax_t)statbuff.st_ino);
 	check_audit(fds, extregex, pipefd);
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(fstat_success, tc)
@@ -245,10 +245,11 @@ ATF_TC_HEAD(statfs_success, tc)
 ATF_TC_BODY(statfs_success, tc)
 {
 	/* File needs to exist to call statfs(2) */
-	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, statfs(path, &statfsbuff));
 	check_audit(fds, successreg, pipefd);
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(statfs_success, tc)
@@ -287,7 +288,6 @@ ATF_TC_HEAD(fstatfs_success, tc)
 
 ATF_TC_BODY(fstatfs_success, tc)
 {
-	int filedesc;
 	/* File needs to exist to call fstat(2) */
 	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
 	/* Call stat(2) to store the Inode number of 'path' */
@@ -298,6 +298,7 @@ ATF_TC_BODY(fstatfs_success, tc)
 	snprintf(extregex, sizeof(extregex), "fstatfs.*%jd.*return,success",
 			(intmax_t)statbuff.st_ino);
 	check_audit(fds, extregex, pipefd);
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(fstatfs_success, tc)
@@ -371,6 +372,7 @@ ATF_TC_CLEANUP(getfsstat_failure, tc)
 {
 	cleanup();
 }
+
 
 ATF_TC_WITH_CLEANUP(fhopen_success);
 ATF_TC_HEAD(fhopen_success, tc)

@@ -35,18 +35,19 @@
 
 #include <atf-c.h>
 #include <fcntl.h>
-#include <stdlib.h>
-#include <time.h>
 #include <unistd.h>
 #include <bsm/audit.h>
 
 #include "utils.h"
 
 static pid_t pid;
+static int filedesc;
 static mode_t mode = 0777;
 static struct pollfd fds[1];
-static char adregex[60];
+static char adregex[80];
+static const char *auclass = "ad";
 static const char *path = "fileforaudit";
+static const char *successreg = "fileforaudit.*return,success";
 
 
 ATF_TC_WITH_CLEANUP(settimeofday_success);
@@ -59,13 +60,13 @@ ATF_TC_HEAD(settimeofday_success, tc)
 ATF_TC_BODY(settimeofday_success, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "settimeofday.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "settimeofday.*%d.*success", pid);
 
 	struct timeval tp;
 	struct timezone tzp;
 	ATF_REQUIRE_EQ(0, gettimeofday(&tp, &tzp));
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	/* Setting the same time as obtained by gettimeofday(2) */
 	ATF_REQUIRE_EQ(0, settimeofday(&tp, &tzp));
 	check_audit(fds, adregex, pipefd);
@@ -87,15 +88,15 @@ ATF_TC_HEAD(settimeofday_failure, tc)
 ATF_TC_BODY(settimeofday_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "settimeofday.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "settimeofday.*%d.*failure", pid);
 
 	struct timeval tp;
 	struct timezone tzp;
 	ATF_REQUIRE_EQ(0, gettimeofday(&tp, &tzp));
 
-	FILE *pipefd = setup(fds, "ad");
-	/* Invalid value for tp.tv_sec; */
+	FILE *pipefd = setup(fds, auclass);
 	tp.tv_sec = -1;
+	/* Failure reason: Invalid value for tp.tv_sec; */
 	ATF_REQUIRE_EQ(-1, settimeofday(&tp, &tzp));
 	check_audit(fds, adregex, pipefd);
 }
@@ -116,11 +117,11 @@ ATF_TC_HEAD(adjtime_success, tc)
 ATF_TC_BODY(adjtime_success, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "adjtime.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "adjtime.*%d.*return,success", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	/* We don't want to change the system time, hence NULL */
-	ATF_REQUIRE_EQ(0, adjtime(NULL,NULL));
+	ATF_REQUIRE_EQ(0, adjtime(NULL, NULL));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -140,9 +141,9 @@ ATF_TC_HEAD(adjtime_failure, tc)
 ATF_TC_BODY(adjtime_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "adjtime.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "adjtime.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, adjtime((struct timeval *)(-1), NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -152,6 +153,52 @@ ATF_TC_CLEANUP(adjtime_failure, tc)
 	cleanup();
 }
 
+
+ATF_TC_WITH_CLEANUP(ntp_adjtime_success);
+ATF_TC_HEAD(ntp_adjtime_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"ntp_adjtime(2) call");
+}
+
+ATF_TC_BODY(ntp_adjtime_success, tc)
+{
+	pid = getpid();
+	struct timex timebuff;
+	snprintf(adregex, sizeof(adregex), "ntp_adjtime.*%d.*success", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE(ntp_adjtime(&timebuff) != -1);
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(ntp_adjtime_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(ntp_adjtime_failure);
+ATF_TC_HEAD(ntp_adjtime_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"ntp_adjtime(2) call");
+}
+
+ATF_TC_BODY(ntp_adjtime_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "ntp_adjtime.*%d.*failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(-1, ntp_adjtime(NULL));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(ntp_adjtime_failure, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(nfs_getfh_success);
@@ -165,13 +212,14 @@ ATF_TC_BODY(nfs_getfh_success, tc)
 {
 	fhandle_t fhp;
 	pid = getpid();
-	snprintf(adregex, 60, "nfs_getfh.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "nfs_getfh.*%d.*ret.*success", pid);
 
 	/* File needs to exist to call getfh(2) */
-	ATF_REQUIRE(open(path, O_CREAT, mode) != -1);
-	FILE *pipefd = setup(fds, "ad");
+	ATF_REQUIRE(filedesc = open(path, O_CREAT, mode) != -1);
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, getfh(path, &fhp));
 	check_audit(fds, adregex, pipefd);
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(nfs_getfh_success, tc)
@@ -190,15 +238,62 @@ ATF_TC_HEAD(nfs_getfh_failure, tc)
 ATF_TC_BODY(nfs_getfh_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "nfs_getfh.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "nfs_getfh.*%d.*ret.*failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: file does not exist */
 	ATF_REQUIRE_EQ(-1, getfh(path, NULL));
 	check_audit(fds, adregex, pipefd);
 }
 
 ATF_TC_CLEANUP(nfs_getfh_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(auditctl_success);
+ATF_TC_HEAD(auditctl_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"auditctl(2) call");
+}
+
+ATF_TC_BODY(auditctl_success, tc)
+{
+	/* File needs to exist in order to call auditctl(2) */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_WRONLY, mode)) != -1);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, auditctl(path));
+	check_audit(fds, successreg, pipefd);
+	close(filedesc);
+}
+
+ATF_TC_CLEANUP(auditctl_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(auditctl_failure);
+ATF_TC_HEAD(auditctl_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"auditctl(2) call");
+}
+
+ATF_TC_BODY(auditctl_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "auditctl.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: file does not exist */
+	ATF_REQUIRE_EQ(-1, auditctl(NULL));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(auditctl_failure, tc)
 {
 	cleanup();
 }
@@ -215,9 +310,9 @@ ATF_TC_BODY(getauid_success, tc)
 {
 	au_id_t auid;
 	pid = getpid();
-	snprintf(adregex, 60, "getauid.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "getauid.*%d.*return,success", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, getauid(&auid));
 	check_audit(fds, adregex, pipefd);
 }
@@ -238,9 +333,10 @@ ATF_TC_HEAD(getauid_failure, tc)
 ATF_TC_BODY(getauid_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "getauid.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "getauid.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Bad address */
 	ATF_REQUIRE_EQ(-1, getauid(NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -262,10 +358,10 @@ ATF_TC_BODY(setauid_success, tc)
 {
 	au_id_t auid;
 	pid = getpid();
-	snprintf(adregex, 60, "setauid.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "setauid.*%d.*return,success", pid);
 	ATF_REQUIRE_EQ(0, getauid(&auid));
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, setauid(&auid));
 	check_audit(fds, adregex, pipefd);
 }
@@ -286,9 +382,10 @@ ATF_TC_HEAD(setauid_failure, tc)
 ATF_TC_BODY(setauid_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "setauid.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "setauid.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Bad address */
 	ATF_REQUIRE_EQ(-1, setauid(NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -308,11 +405,11 @@ ATF_TC_HEAD(getaudit_success, tc)
 
 ATF_TC_BODY(getaudit_success, tc)
 {
-	auditinfo_t auditinfo;
 	pid = getpid();
-	snprintf(adregex, 60, "getaudit.*%d.*return,success", pid);
+	auditinfo_t auditinfo;
+	snprintf(adregex, sizeof(adregex), "getaudit.*%d.*return,success", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, getaudit(&auditinfo));
 	check_audit(fds, adregex, pipefd);
 }
@@ -333,9 +430,10 @@ ATF_TC_HEAD(getaudit_failure, tc)
 ATF_TC_BODY(getaudit_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "getaudit.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "getaudit.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Bad address */
 	ATF_REQUIRE_EQ(-1, getaudit(NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -355,12 +453,12 @@ ATF_TC_HEAD(setaudit_success, tc)
 
 ATF_TC_BODY(setaudit_success, tc)
 {
-	auditinfo_t auditinfo;
 	pid = getpid();
-	snprintf(adregex, 60, "setaudit.*%d.*return,success", pid);
+	auditinfo_t auditinfo;
+	snprintf(adregex, sizeof(adregex), "setaudit.*%d.*return,success", pid);
 	ATF_REQUIRE_EQ(0, getaudit(&auditinfo));
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, setaudit(&auditinfo));
 	check_audit(fds, adregex, pipefd);
 }
@@ -381,9 +479,10 @@ ATF_TC_HEAD(setaudit_failure, tc)
 ATF_TC_BODY(setaudit_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "setaudit.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "setaudit.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Bad address */
 	ATF_REQUIRE_EQ(-1, setaudit(NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -403,13 +502,13 @@ ATF_TC_HEAD(getaudit_addr_success, tc)
 
 ATF_TC_BODY(getaudit_addr_success, tc)
 {
-	auditinfo_addr_t auditinfo;
-	u_int *length = (u_int *)malloc(sizeof(u_int));
 	pid = getpid();
-	snprintf(adregex, 60, "getaudit_addr.*%d.*return,success", pid);
+	auditinfo_addr_t auditinfo;
+	snprintf(adregex, sizeof(adregex),
+		"getaudit_addr.*%d.*return,success", pid);
 
-	FILE *pipefd = setup(fds, "ad");
-	ATF_REQUIRE_EQ(0, getaudit_addr(&auditinfo, *length));
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, getaudit_addr(&auditinfo, sizeof(auditinfo)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -429,9 +528,11 @@ ATF_TC_HEAD(getaudit_addr_failure, tc)
 ATF_TC_BODY(getaudit_addr_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "getaudit_addr.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex),
+		"getaudit_addr.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Bad address */
 	ATF_REQUIRE_EQ(-1, getaudit_addr(NULL, 0));
 	check_audit(fds, adregex, pipefd);
 }
@@ -451,14 +552,14 @@ ATF_TC_HEAD(setaudit_addr_success, tc)
 
 ATF_TC_BODY(setaudit_addr_success, tc)
 {
-	auditinfo_addr_t auditinfo;
-	u_int *length = (u_int *)malloc(sizeof(u_int));
 	pid = getpid();
-	snprintf(adregex, 60, "setaudit_addr.*%d.*return,success", pid);
-	ATF_REQUIRE_EQ(0, getaudit_addr(&auditinfo, *length));
+	auditinfo_addr_t auditinfo;
+	snprintf(adregex, sizeof(adregex),
+		"setaudit_addr.*%d.*return,success", pid);
 
-	FILE *pipefd = setup(fds, "ad");
-	ATF_REQUIRE_EQ(0, setaudit_addr(&auditinfo, *length));
+	ATF_REQUIRE_EQ(0, getaudit_addr(&auditinfo, sizeof(auditinfo)));
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, setaudit_addr(&auditinfo, sizeof(auditinfo)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -478,9 +579,11 @@ ATF_TC_HEAD(setaudit_addr_failure, tc)
 ATF_TC_BODY(setaudit_addr_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "setaudit_addr.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex),
+		"setaudit_addr.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Bad address */
 	ATF_REQUIRE_EQ(-1, setaudit_addr(NULL, 0));
 	check_audit(fds, adregex, pipefd);
 }
@@ -507,9 +610,9 @@ ATF_TC_HEAD(reboot_failure, tc)
 ATF_TC_BODY(reboot_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "reboot.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "reboot.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, reboot(-1));
 	check_audit(fds, adregex, pipefd);
 }
@@ -536,9 +639,9 @@ ATF_TC_HEAD(acct_failure, tc)
 ATF_TC_BODY(acct_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "acct.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "acct.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, acct(path));
 	check_audit(fds, adregex, pipefd);
 }
@@ -565,9 +668,9 @@ ATF_TC_HEAD(quotactl_failure, tc)
 ATF_TC_BODY(quotactl_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "quotactl.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "quotactl.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, quotactl(NULL, 0, 0, NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -594,9 +697,9 @@ ATF_TC_HEAD(mount_failure, tc)
 ATF_TC_BODY(mount_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "mount.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "mount.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, mount(NULL, NULL, 0, NULL));
 	check_audit(fds, adregex, pipefd);
 }
@@ -617,9 +720,9 @@ ATF_TC_HEAD(nmount_failure, tc)
 ATF_TC_BODY(nmount_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, 60, "nmount.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "nmount.*%d.*return,failure", pid);
 
-	FILE *pipefd = setup(fds, "ad");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(-1, nmount(NULL, 0, 0));
 	check_audit(fds, adregex, pipefd);
 }
@@ -630,62 +733,19 @@ ATF_TC_CLEANUP(nmount_failure, tc)
 }
 
 
-ATF_TC_WITH_CLEANUP(ntp_adjtime_failure);
-ATF_TC_HEAD(ntp_adjtime_failure, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
-					"ntp_adjtime(2) call");
-}
-
-ATF_TC_BODY(ntp_adjtime_failure, tc)
-{
-	pid = getpid();
-	snprintf(adregex, 60, "ntp_adjtime.*%d.*return,failure", pid);
-
-	FILE *pipefd = setup(fds, "ad");
-	ATF_REQUIRE_EQ(-1, ntp_adjtime(NULL));
-	check_audit(fds, adregex, pipefd);
-}
-
-ATF_TC_CLEANUP(ntp_adjtime_failure, tc)
-{
-	cleanup();
-}
-
-
-ATF_TC_WITH_CLEANUP(auditctl_failure);
-ATF_TC_HEAD(auditctl_failure, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
-					"auditctl(2) call");
-}
-
-ATF_TC_BODY(auditctl_failure, tc)
-{
-	pid = getpid();
-	snprintf(adregex, 60, "auditctl.*%d.*return,failure", pid);
-
-	FILE *pipefd = setup(fds, "ad");
-	ATF_REQUIRE_EQ(-1, auditctl(NULL));
-	check_audit(fds, adregex, pipefd);
-}
-
-ATF_TC_CLEANUP(auditctl_failure, tc)
-{
-	cleanup();
-}
-
-
-
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, settimeofday_success);
 	ATF_TP_ADD_TC(tp, settimeofday_failure);
 	ATF_TP_ADD_TC(tp, adjtime_success);
 	ATF_TP_ADD_TC(tp, adjtime_failure);
+	ATF_TP_ADD_TC(tp, ntp_adjtime_success);
+	ATF_TP_ADD_TC(tp, ntp_adjtime_failure);
 
 	ATF_TP_ADD_TC(tp, nfs_getfh_success);
 	ATF_TP_ADD_TC(tp, nfs_getfh_failure);
+	ATF_TP_ADD_TC(tp, auditctl_success);
+	ATF_TP_ADD_TC(tp, auditctl_failure);
 
 	ATF_TP_ADD_TC(tp, getauid_success);
 	ATF_TP_ADD_TC(tp, getauid_failure);
@@ -707,8 +767,6 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, quotactl_failure);
 	ATF_TP_ADD_TC(tp, mount_failure);
 	ATF_TP_ADD_TC(tp, nmount_failure);
-	ATF_TP_ADD_TC(tp, ntp_adjtime_failure);
-	ATF_TP_ADD_TC(tp, auditctl_failure);
 
 	return (atf_no_error());
 }

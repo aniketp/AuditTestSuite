@@ -62,25 +62,4 @@ This application would consist of a set of test programs written in `atf-c(3)`, 
 * [Report2: File-read System Call testing](https://gist.github.com/aniketp/ada457f284c362da5b4ecae8929a807e)
 * [Report3: atf-c(3) test program for mkdir(2)](https://gist.github.com/aniketp/498b0e39b52485d50b67736779622dd6)
 
-## Directory Structure
 
-```
- ├── docs --------------------- Relevant documentations and project proposal
- ├── src ---------------------- Actual atf-c test-programs for audit(4)
- │   ├── file-create.c
- │   ├── setup.c -------------- Source file for setup and helper functions
- │   └── setup.h
- └── test
-     ├── filesystem
-     │   ├── run_tests -------- [Automation Script]
-     │   ├── src
-     │   │   └── -------------- Source files for testing "fc/fr/fa" audit_class
-     │   └── tests
-     │       └── mkdir-atf0.c - Initial test-program for File I/O system calls
-     ├── sockets
-     │   ├── run_tests -------- [Automation Script]
-     │   └── src
-     │       └── -------------- Source files for testing "nt" audit_class
-     └── scripts -------------- Helper scripts for collecting stuff from trails
-```
-1

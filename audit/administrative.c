@@ -29,14 +29,15 @@
 #include <sys/mount.h>
 #include <sys/reboot.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/timex.h>
 #include <ufs/ufs/quota.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <bsm/audit.h>
 
 #include "utils.h"
 
@@ -163,8 +164,10 @@ ATF_TC_HEAD(ntp_adjtime_success, tc)
 
 ATF_TC_BODY(ntp_adjtime_success, tc)
 {
-	pid = getpid();
 	struct timex timebuff;
+	bzero(&timebuff, sizeof(timebuff));
+
+	pid = getpid();
 	snprintf(adregex, sizeof(adregex), "ntp_adjtime.*%d.*success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
@@ -271,7 +274,9 @@ ATF_TC_BODY(auditctl_success, tc)
 
 ATF_TC_CLEANUP(auditctl_success, tc)
 {
-	cleanup();
+	system("service auditd onestop > /dev/null 2>&1");
+	if (!atf_utils_file_exists("started_auditd"))
+		system("service auditd onestart > /dev/null 2>&1");
 }
 
 
@@ -294,6 +299,87 @@ ATF_TC_BODY(auditctl_failure, tc)
 }
 
 ATF_TC_CLEANUP(auditctl_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(acct_success);
+ATF_TC_HEAD(acct_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"acct(2) call");
+}
+
+ATF_TC_BODY(acct_success, tc)
+{
+	int acctinfo;
+	size_t len = sizeof(acctinfo);
+	const char *acctpath = NULL;
+	const char *acctregex = "accounting off";
+	const char *acctname = "kern.acct_configured";
+	ATF_REQUIRE_EQ(0, sysctlbyname(acctname, &acctinfo, &len, NULL, 0));
+
+	/*
+	 * acctinfo = 0: System accounting was disabled
+	 * acctinfo = 1: System accounting was enabled
+	 */
+	if (acctinfo) {
+		acctpath = "fileforacctaudit";
+		acctregex = "fileforacctaudit";
+		/* File needs to exist to start system accounting */
+		ATF_REQUIRE((filedesc =
+			open(acctpath, O_CREAT | O_RDWR, mode)) != -1);
+	}
+
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex),
+		"acct.*%s.*%d.*ret.*success", acctregex, pid);
+
+	/*
+	 * If system accouting was disabled before, we don't enable it
+	 * (by passing NULL as acctpath)
+	 * If it was enabled, we temporarily switch the accounting record to
+	 * our own configured path in order to confirm acct(2)'s successful
+	 * auditing. Then we set everything back to its original state.
+	 */
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, acct(acctpath));
+	check_audit(fds, adregex, pipefd);
+
+	/* Reset accounting configured path */
+	if (acctinfo) {
+		close(filedesc);
+		ATF_REQUIRE_EQ(0, system("service accounting onestop"));
+		ATF_REQUIRE_EQ(0, system("service accounting onestart"));
+	}
+}
+
+ATF_TC_CLEANUP(acct_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(acct_failure);
+ATF_TC_HEAD(acct_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"acct(2) call");
+}
+
+ATF_TC_BODY(acct_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "acct.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: File does not exist */
+	ATF_REQUIRE_EQ(-1, acct(path));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(acct_failure, tc)
 {
 	cleanup();
 }
@@ -624,35 +710,6 @@ ATF_TC_CLEANUP(reboot_failure, tc)
 
 
 /*
- * Audit of acct(2) cannot be tested in normal conditions as we don't want
- * to enable/disable the collection of system accounting records
- */
-
-
-ATF_TC_WITH_CLEANUP(acct_failure);
-ATF_TC_HEAD(acct_failure, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
-					"acct(2) call");
-}
-
-ATF_TC_BODY(acct_failure, tc)
-{
-	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "acct.*%d.*return,failure", pid);
-
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(-1, acct(path));
-	check_audit(fds, adregex, pipefd);
-}
-
-ATF_TC_CLEANUP(acct_failure, tc)
-{
-	cleanup();
-}
-
-
-/*
  * Audit of quotactl(2) cannot be tested in normal conditions as we don't want
  * to tamper with filesystem quotas
  */
@@ -746,6 +803,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, nfs_getfh_failure);
 	ATF_TP_ADD_TC(tp, auditctl_success);
 	ATF_TP_ADD_TC(tp, auditctl_failure);
+	ATF_TP_ADD_TC(tp, acct_success);
+	ATF_TP_ADD_TC(tp, acct_failure);
 
 	ATF_TP_ADD_TC(tp, getauid_success);
 	ATF_TP_ADD_TC(tp, getauid_failure);
@@ -763,7 +822,6 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, setaudit_addr_failure);
 
 	ATF_TP_ADD_TC(tp, reboot_failure);
-	ATF_TP_ADD_TC(tp, acct_failure);
 	ATF_TP_ADD_TC(tp, quotactl_failure);
 	ATF_TP_ADD_TC(tp, mount_failure);
 	ATF_TP_ADD_TC(tp, nmount_failure);

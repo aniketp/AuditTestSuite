@@ -1,6 +1,6 @@
 # Regression Test-Suite for Audit Framework
 An implementation of regression testsuite for FreeBSD's audit subsystem. Made as a part of [GSoC'18 with FreeBSD](https://summerofcode.withgoogle.com/projects/#4507139591110656). <br/>
-For a complete overview and updates on the project, checkout the [Project Wiki](https://wiki.freebsd.org/SummerOfCode2018Projects/RegressionTestSuiteForAuditFramework).
+**For a complete overview and further updates on the project, checkout the [Project Wiki](https://wiki.freebsd.org/SummerOfCode2018Projects/RegressionTestSuiteForAuditFramework)**.
 
 ## Overview
 FreeBSD is a rapidly developing operating system with an extreme focus on advanced security & networking features. For an OS with a widespread usage and development, testing and monitoring of security regressions becomes a critical measure. FreeBSD has an audit subsystem which is responsible for monitoring a variety of security-relevant system events, such as user-logins, configuration changes, file system & network access. Although the audit framework is indispensable for security conscious organisations running FreeBSD servers, currently there is no tool to test its reliability and the intended behaviour.

@@ -45,8 +45,7 @@
 #include "utils.h"
 
 static pid_t pid;
-static int status;
-static int filedesc;
+static int filedesc, status;
 static struct pollfd fds[1];
 static char pcregex[80];
 static const char *auclass = "pc";
@@ -67,12 +66,10 @@ ATF_TC_BODY(fork_success, tc)
 	FILE *pipefd = setup(fds, auclass);
 	/* Check if fork(2) succeded. If so, exit from the child process */
 	ATF_REQUIRE((pid = fork()) != -1);
-	if (pid) {
-		ATF_REQUIRE(wait(&status) != -1);
+	if (pid)
 		check_audit(fds, pcregex, pipefd);
-	}
 	else
-		exit(0);
+		_exit(0);
 
 }
 
@@ -101,12 +98,10 @@ ATF_TC_BODY(rfork_success, tc)
 
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE((pid = rfork(RFPROC)) != -1);
-	if (pid) {
-		ATF_REQUIRE(wait(&status) != -1);
+	if (pid)
 		check_audit(fds, pcregex, pipefd);
-	}
 	else
-		exit(0);
+		_exit(0);
 
 }
 
@@ -149,13 +144,11 @@ ATF_TC_HEAD(chdir_success, tc)
 
 ATF_TC_BODY(chdir_success, tc)
 {
-	/* Build an absolute path to the test-case directory */
-	char dirpath[50];
-	ATF_REQUIRE(getcwd(dirpath, sizeof(dirpath)) != NULL);
-	snprintf(pcregex, sizeof(pcregex), "chdir.*%s.*return,success", dirpath);
+	pid = getpid();
+	snprintf(pcregex, sizeof(pcregex), "chdir.*/.*%d.*return,success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, chdir(dirpath));
+	ATF_REQUIRE_EQ(0, chdir("/"));
 	check_audit(fds, pcregex, pipefd);
 }
 
@@ -650,14 +643,11 @@ ATF_TC_HEAD(setpriority_success, tc)
 
 ATF_TC_BODY(setpriority_success, tc)
 {
-	int prio_value;
 	pid = getpid();
 	snprintf(pcregex, sizeof(pcregex), "setpriority.*%d.*success", pid);
-	/* Retrieve the priority value of current process to be used later */
-	ATF_REQUIRE((prio_value = getpriority(PRIO_PROCESS, 0)) != -1);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, setpriority(PRIO_PROCESS, 0, prio_value));
+	ATF_REQUIRE_EQ(0, setpriority(PRIO_PROCESS, 0, 0));
 	check_audit(fds, pcregex, pipefd);
 }
 
@@ -699,12 +689,14 @@ ATF_TC_HEAD(setgroups_success, tc)
 
 ATF_TC_BODY(setgroups_success, tc)
 {
-	gid_t gidset;
+	gid_t gids[5];
 	pid = getpid();
 	snprintf(pcregex, sizeof(pcregex), "setgroups.*%d.*ret.*success", pid);
+	/* Retrieve the current group access list to be used with setgroups */
+	ATF_REQUIRE(getgroups(sizeof(gids)/sizeof(gids[0]), gids) != -1);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, setgroups(1, &gidset));
+	ATF_REQUIRE_EQ(0, setgroups(sizeof(gids)/sizeof(gids[0]), gids));
 	check_audit(fds, pcregex, pipefd);
 }
 
@@ -736,9 +728,7 @@ ATF_TC_CLEANUP(setgroups_failure, tc)
 	cleanup();
 }
 
-/*
- * setpgrp(2) success case to be tested
- */
+
 ATF_TC_WITH_CLEANUP(setpgrp_success);
 ATF_TC_HEAD(setpgrp_success, tc)
 {
@@ -748,12 +738,18 @@ ATF_TC_HEAD(setpgrp_success, tc)
 
 ATF_TC_BODY(setpgrp_success, tc)
 {
-	pid = getpid();
-	snprintf(pcregex, sizeof(pcregex), "setpgrp.*%d.*return,success", pid);
+	/* Main procedure is carried out from within the child process */
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		ATF_REQUIRE(wait(&status) != -1);
+	} else {
+		pid = getpid();
+		snprintf(pcregex, sizeof(pcregex), "setpgrp.*%d.*success", pid);
 
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, setpgrp(pid, pid));
-	check_audit(fds, pcregex, pipefd);
+		FILE *pipefd = setup(fds, auclass);
+		ATF_REQUIRE_EQ(0, setpgrp(0, 0));
+		check_audit(fds, pcregex, pipefd);
+	}
 }
 
 ATF_TC_CLEANUP(setpgrp_success, tc)
@@ -972,10 +968,30 @@ ATF_TC_CLEANUP(minherit_failure, tc)
 }
 
 
-/*
- * setlogin(2) cannot be tested in success mode since we don't want to change
- * the login name of root user
- */
+ATF_TC_WITH_CLEANUP(setlogin_success);
+ATF_TC_HEAD(setlogin_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"setlogin(2) call");
+}
+
+ATF_TC_BODY(setlogin_success, tc)
+{
+	char *name;
+	pid = getpid();
+	snprintf(pcregex, sizeof(pcregex), "setlogin.*%d.*return,success", pid);
+
+	/* Retrieve the current user's login name to be used with setlogin(2) */
+	ATF_REQUIRE((name = getlogin()) != NULL);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, setlogin(name));
+	check_audit(fds, pcregex, pipefd);
+}
+
+ATF_TC_CLEANUP(setlogin_success, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(setlogin_failure);
@@ -1155,7 +1171,7 @@ ATF_TC_BODY(ktrace_success, tc)
 	snprintf(pcregex, sizeof(pcregex), "ktrace.*%d.*return,success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, ktrace(NULL, KTROP_CLEAR, KTRFAC_SYSCALL, 0));
+	ATF_REQUIRE_EQ(0, ktrace(NULL, KTROP_CLEAR, KTRFAC_SYSCALL, pid));
 	check_audit(fds, pcregex, pipefd);
 }
 
@@ -1233,6 +1249,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, minherit_success);
 	ATF_TP_ADD_TC(tp, minherit_failure);
 
+	ATF_TP_ADD_TC(tp, setlogin_success);
 	ATF_TP_ADD_TC(tp, setlogin_failure);
 	ATF_TP_ADD_TC(tp, rtprio_success);
 	ATF_TP_ADD_TC(tp, rtprio_failure);

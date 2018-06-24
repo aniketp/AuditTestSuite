@@ -27,15 +27,20 @@
 
 #include <sys/ioctl.h>
 
-#include <atf-c.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <bsm/libbsm.h>
 #include <security/audit/audit_ioctl.h>
 
+#include <atf-c.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "utils.h"
 
+static int filedesc;
+static char ioregex[80];
+static const char *auclass = "io";
 static struct pollfd fds[1];
+static unsigned long request = AUDITPIPE_FLUSH;
 
 
 ATF_TC_WITH_CLEANUP(ioctl_success);
@@ -47,17 +52,16 @@ ATF_TC_HEAD(ioctl_success, tc)
 
 ATF_TC_BODY(ioctl_success, tc)
 {
-	int filedesc;
-	char regex[30];
-
-	/* auditpipe(4) supports quite a few ioctl(2)s */
+	/* auditpipe(4) supports quite a few ioctls */
 	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
 	/* Prepare the regex to be checked in the audit record */
-	snprintf(regex, 30, "ioctl.*0x%x.*return,success", filedesc);
+	snprintf(ioregex, sizeof(ioregex),
+	"ioctl.*%#lx.*%#x.*return,success", request, filedesc);
 
-	FILE *pipefd = setup(fds, "io");
-	ATF_REQUIRE(ioctl(filedesc, AUDITPIPE_FLUSH) != -1);
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE(ioctl(filedesc, request) != -1);
+	check_audit(fds, ioregex, pipefd);
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(ioctl_success, tc)
@@ -75,10 +79,13 @@ ATF_TC_HEAD(ioctl_failure, tc)
 
 ATF_TC_BODY(ioctl_failure, tc)
 {
-	const char *regex = "ioctl.*return,failure : Bad file descriptor";
-	FILE *pipefd = setup(fds, "io");
-	ATF_REQUIRE_EQ(-1, ioctl(-1, AUDITPIPE_FLUSH));
-	check_audit(fds, regex, pipefd);
+	snprintf(ioregex, sizeof(ioregex),
+	"ioctl.*%#lx.*return,failure : Bad file descriptor", request);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid file descriptor */
+	ATF_REQUIRE_EQ(-1, ioctl(-1, request));
+	check_audit(fds, ioregex, pipefd);
 }
 
 ATF_TC_CLEANUP(ioctl_failure, tc)

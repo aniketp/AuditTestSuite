@@ -91,7 +91,7 @@ These are the three pre-SoC reports outlining the initial approach on building a
 * [Report3: atf-c(3) test program for mkdir(2)](https://gist.github.com/aniketp/498b0e39b52485d50b67736779622dd6)
 
 ## References
-3 Test Suites for various sections of FreeBSD kernel and base-system were built as 3 consecutive GSoC projects.
+3 Test Suites for various sections of FreeBSD kernel and base-system were developed as 3 consecutive GSoC projects.
 
 | Year | Project | Author |
 |------|---------|--------|

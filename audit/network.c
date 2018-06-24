@@ -26,15 +26,10 @@
  */
 
 #include <sys/types.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/un.h>
-
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
@@ -43,70 +38,48 @@
 
 #include "utils.h"
 
-#define ERROR (-1)
+#define MAX_DATA 128
 #define SERVER_PATH "server"
-#define MAX_DATA 1024
 
-static struct pollfd fds[1];
-static int sockfd, sockfd2;
-static int tr = 1;
-static socklen_t len;
+static pid_t pid;
 static mode_t mode = 0777;
-static char regex[60];
+static int sockfd, sockfd2, connectfd;
+static ssize_t data_bytes;
+static socklen_t len = sizeof(struct sockaddr_un);
+static struct iovec io1, io2;
+static struct pollfd fds[1];
+static struct sockaddr_un server;
+static struct msghdr sendbuf, recvbuf;
+static char extregex[MAX_DATA];
 static char data[MAX_DATA];
-static char msgbuff[] = "Sample Message";
+static char msgbuff[MAX_DATA] = "This message does not exist";
+static const char *auclass = "nt";
 static const char *path = "fileforaudit";
-
-/*
- * Assign local address to a server's socket
- */
-static void
-assign_address(struct sockaddr_un *server)
-{
-	memset(server, 0, sizeof(*server));
-	server->sun_family = AF_UNIX;
-	strcpy(server->sun_path, SERVER_PATH);
-}
-
-/*
- * Check the read status of client socket descriptor
- */
-static int
-check_readfs(int clientfd)
-{
-	struct timeval timeout;
-	timeout.tv_sec = 5;
-	timeout.tv_usec = 0;
-
-	/* Initialize fd_set using the provided MACROS for select() */
-	fd_set readfs;
-	FD_ZERO(&readfs);
- 	FD_SET(clientfd, &readfs);
-
-	/* Check if clientfd is ready for receiving data and return */
-	ATF_REQUIRE(select(clientfd+1, &readfs, NULL, NULL, &timeout) > 0);
-	return (FD_ISSET(clientfd, &readfs));
-}
+static const char *nosupregex = "return,failure : Address family "
+				"not supported by protocol family";
+static const char *invalregex = "return,failure : Bad file descriptor";
 
 /*
  * Initialize iovec structure to be used as a field of struct msghdr
  */
 static void
-init_iov(struct iovec *io, char msgbuf[], int DATALEN)
+init_iov(struct iovec *io, char msgbuf[], int datalen)
 {
 	io->iov_base = msgbuf;
-	io->iov_len = DATALEN;
+	io->iov_len = datalen;
 }
 
 /*
  * Initialize msghdr structure for communication via datagram sockets
  */
 static void
-init_msghdr(struct msghdr *hdrbuf, struct iovec *io, struct sockaddr_un *address)
+init_msghdr(struct msghdr *hdrbuf, struct iovec *io, struct sockaddr_un *addr)
 {
-	ssize_t length;
-	length = sizeof(struct sockaddr_un);
-	hdrbuf->msg_name = address;
+	socklen_t length;
+
+	bzero(hdrbuf, sizeof(*hdrbuf));
+	length = (socklen_t)sizeof(struct sockaddr_un);
+	hdrbuf->msg_name = addr;
 	hdrbuf->msg_namelen = length;
 	hdrbuf->msg_iov = io;
 	hdrbuf->msg_iovlen = 1;
@@ -127,6 +100,17 @@ close_sockets(int count, ...)
 	va_end(socklist);
 }
 
+/*
+ * Assign local filesystem address to a Unix domain socket
+ */
+static void
+assign_address(struct sockaddr_un *serveraddr)
+{
+	memset(serveraddr, 0, sizeof(*serveraddr));
+	serveraddr->sun_family = AF_UNIX;
+	strcpy(serveraddr->sun_path, SERVER_PATH);
+}
+
 
 ATF_TC_WITH_CLEANUP(socket_success);
 ATF_TC_HEAD(socket_success, tc)
@@ -137,11 +121,11 @@ ATF_TC_HEAD(socket_success, tc)
 
 ATF_TC_BODY(socket_success, tc)
 {
-	FILE *pipefd = setup(fds, "nt");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	/* Check the presence of sockfd in audit record */
-	snprintf(regex, 60, "socket.*return,success,%d", sockfd);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "socket.*ret.*success,%d", sockfd);
+	check_audit(fds, extregex, pipefd);
 	close(sockfd);
 }
 
@@ -160,11 +144,11 @@ ATF_TC_HEAD(socket_failure, tc)
 
 ATF_TC_BODY(socket_failure, tc)
 {
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, socket(ERROR, SOCK_STREAM, 0));
-	/* Check the presence of hex(-1) in audit record */
-	snprintf(regex, 60, "socket.*0x%x.*return,failure", ERROR);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "socket.*%s", nosupregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Unsupported value of 'domain' argument: 0 */
+	ATF_REQUIRE_EQ(-1, socket(0, SOCK_STREAM, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(socket_failure, tc)
@@ -183,12 +167,12 @@ ATF_TC_HEAD(socketpair_success, tc)
 ATF_TC_BODY(socketpair_success, tc)
 {
 	int sv[2];
-	FILE *pipefd = setup(fds, "nt");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, socketpair(PF_UNIX, SOCK_STREAM, 0, sv));
-	/* Check the presence of 0x0 in audit record */
-	snprintf(regex, 60, "socketpair.*0x0.*return,success");
-	check_audit(fds, regex, pipefd);
-	/* Close all socket descriptors */
+
+	/* Check for 0x0 (argument 3: default protocol) in the audit record */
+	snprintf(extregex, sizeof(extregex), "socketpair.*0x0.*return,success");
+	check_audit(fds, extregex, pipefd);
 	close_sockets(2, sv[0], sv[1]);
 }
 
@@ -207,12 +191,11 @@ ATF_TC_HEAD(socketpair_failure, tc)
 
 ATF_TC_BODY(socketpair_failure, tc)
 {
-	int sv;
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, socketpair(ERROR, SOCK_STREAM, 0, &sv));
-	/* Check the presence of hex(-1) in audit record */
-	snprintf(regex, 60, "socketpair.*0x%x.*return,failure", ERROR);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "socketpair.*%s", nosupregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Unsupported value of 'domain' argument: 0 */
+	ATF_REQUIRE_EQ(-1, socketpair(0, SOCK_STREAM, 0, NULL));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(socketpair_failure, tc)
@@ -230,14 +213,16 @@ ATF_TC_HEAD(setsockopt_success, tc)
 
 ATF_TC_BODY(setsockopt_success, tc)
 {
+	int tr = 1;
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	/* Check the presence of sockfd in audit record */
-	snprintf(regex, 60, "setsockopt.*0x%x.*return,success", sockfd);
+	snprintf(extregex, sizeof(extregex),
+			"setsockopt.*0x%x.*return,success", sockfd);
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tr, \
-		sizeof(int)));
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, setsockopt(sockfd, SOL_SOCKET,
+		SO_REUSEADDR, &tr, sizeof(int)));
+	check_audit(fds, extregex, pipefd);
 	close(sockfd);
 }
 
@@ -256,12 +241,11 @@ ATF_TC_HEAD(setsockopt_failure, tc)
 
 ATF_TC_BODY(setsockopt_failure, tc)
 {
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, setsockopt(ERROR, SOL_SOCKET, SO_REUSEADDR, &tr, \
-		sizeof(int)));
-	/* Check the presence of hex(-1) in audit record */
-	snprintf(regex, 60, "setsockopt.*0x%x.*return,failure", ERROR);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "setsockopt.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, setsockopt(-1, SOL_SOCKET, 0, NULL, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(setsockopt_failure, tc)
@@ -279,18 +263,16 @@ ATF_TC_HEAD(bind_success, tc)
 
 ATF_TC_BODY(bind_success, tc)
 {
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
 	/* Preliminary socket setup */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	/* Check the presence of AF_UNIX address path in audit record */
-	snprintf(regex, 60, "bind.*unix.*%s.*return,success", SERVER_PATH);
+	snprintf(extregex, sizeof(extregex),
+		"bind.*unix.*%s.*return,success", SERVER_PATH);
 
-	FILE *pipefd = setup(fds, "nt");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
-	check_audit(fds, regex, pipefd);
+	check_audit(fds, extregex, pipefd);
 	close(sockfd);
 }
 
@@ -309,16 +291,15 @@ ATF_TC_HEAD(bind_failure, tc)
 
 ATF_TC_BODY(bind_failure, tc)
 {
-	/* Preliminary socket setup */
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
+	/* Check the presence of AF_UNIX path in audit record */
+	snprintf(extregex, sizeof(extregex),
+			"bind.*%s.*return,failure", SERVER_PATH);
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, bind(-1, (struct sockaddr *)&server, len));
-	/* Check the presence of hex(-1) and AF_UNIX path in audit record */
-	snprintf(regex, 60, "bind.*0x%x.*%s.*return,failure", ERROR, SERVER_PATH);
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, bind(0, (struct sockaddr *)&server, len));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(bind_failure, tc)
@@ -336,19 +317,17 @@ ATF_TC_HEAD(bindat_success, tc)
 
 ATF_TC_BODY(bindat_success, tc)
 {
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
 	/* Preliminary socket setup */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	/* Check the presence of socket descriptor in audit record */
-	snprintf(regex, 60, "bindat.*0x%x.*return,success", sockfd);
+	snprintf(extregex, sizeof(extregex),
+			"bindat.*0x%x.*return,success", sockfd);
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(0, bindat(AT_FDCWD, sockfd, \
-		(struct sockaddr *)&server, len));
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, bindat(AT_FDCWD, sockfd,
+			(struct sockaddr *)&server, len));
+	check_audit(fds, extregex, pipefd);
 	close(sockfd);
 }
 
@@ -367,16 +346,14 @@ ATF_TC_HEAD(bindat_failure, tc)
 
 ATF_TC_BODY(bindat_failure, tc)
 {
-	/* Preliminary socket setup */
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
+	snprintf(extregex, sizeof(extregex), "bindat.*%s", invalregex);
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, bindat(AT_FDCWD, -1, (struct sockaddr *)&server, len));
-	/* Check the presence of hex(-1) in audit record */
-	snprintf(regex, 60, "bindat.*0x%x.*return,failure", ERROR);
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, bindat(AT_FDCWD, -1,
+			(struct sockaddr *)&server, len));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(bindat_failure, tc)
@@ -394,19 +371,17 @@ ATF_TC_HEAD(listen_success, tc)
 
 ATF_TC_BODY(listen_success, tc)
 {
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
 	/* Preliminary socket setup */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	/* Check the presence of socket descriptor in the audit record */
-	snprintf(regex, 60, "listen.*0x%x.*return,success", sockfd);
+	snprintf(extregex, sizeof(extregex),
+			"listen.*0x%x.*return,success", sockfd);
 
-	FILE *pipefd = setup(fds, "nt");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
-	check_audit(fds, regex, pipefd);
+	check_audit(fds, extregex, pipefd);
 	close(sockfd);
 }
 
@@ -425,11 +400,11 @@ ATF_TC_HEAD(listen_failure, tc)
 
 ATF_TC_BODY(listen_failure, tc)
 {
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, listen(ERROR, 1));
-	/* Check the presence of hex(-1) in audit record */
-	snprintf(regex, 60, "listen.*0x%x.*return,failure", ERROR);
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "listen.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, listen(-1, 1));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(listen_failure, tc)
@@ -447,15 +422,9 @@ ATF_TC_HEAD(connect_success, tc)
 
 ATF_TC_BODY(connect_success, tc)
 {
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
+	/* Setup a server socket and bind to the specified address */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
@@ -463,11 +432,12 @@ ATF_TC_BODY(connect_success, tc)
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 
 	/* Audit record must contain AF_UNIX address path & sockfd2 */
-	snprintf(regex, 60, "connect.*0x%x.*%s.*success", sockfd2, SERVER_PATH);
+	snprintf(extregex, sizeof(extregex),
+			"connect.*0x%x.*%s.*success", sockfd2, SERVER_PATH);
 
-	FILE *pipefd = setup(fds, "nt");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
-	check_audit(fds, regex, pipefd);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
 	close_sockets(2, sockfd, sockfd2);
@@ -488,17 +458,15 @@ ATF_TC_HEAD(connect_failure, tc)
 
 ATF_TC_BODY(connect_failure, tc)
 {
-	/* Preliminary socket setup */
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
+	/* Audit record must contain AF_UNIX address path */
+	snprintf(extregex, sizeof(extregex),
+			"connect.*%s.*return,failure", SERVER_PATH);
 
-	/* Audit record must contain AF_UNIX address path & Hex(-1) */
-	snprintf(regex, 60, "connect.*0x%x.*%s.*failure", ERROR, SERVER_PATH);
-
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, connect(ERROR, (struct sockaddr *)&server, len));
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, connect(-1, (struct sockaddr *)&server, len));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(connect_failure, tc)
@@ -516,15 +484,9 @@ ATF_TC_HEAD(connectat_success, tc)
 
 ATF_TC_BODY(connectat_success, tc)
 {
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
+	/* Setup a server socket and bind to the specified address */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
@@ -532,12 +494,13 @@ ATF_TC_BODY(connectat_success, tc)
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 
 	/* Audit record must contain sockfd2 */
-	snprintf(regex, 60, "connectat.*0x%x.*return,success", sockfd2);
+	snprintf(extregex, sizeof(extregex),
+			"connectat.*0x%x.*return,success", sockfd2);
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(0, connectat(AT_FDCWD, sockfd2, \
-		(struct sockaddr *)&server, len));
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, connectat(AT_FDCWD, sockfd2,
+			(struct sockaddr *)&server, len));
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
 	close_sockets(2, sockfd, sockfd2);
@@ -558,18 +521,14 @@ ATF_TC_HEAD(connectat_failure, tc)
 
 ATF_TC_BODY(connectat_failure, tc)
 {
-	/* Preliminary socket setup */
-	struct sockaddr_un server;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
+	snprintf(extregex, sizeof(extregex), "connectat.*%s", invalregex);
 
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "connectat.*0x%x.*return,failure", ERROR);
-
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, connectat(AT_FDCWD, ERROR, \
-		(struct sockaddr *)&server, len));
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, connectat(AT_FDCWD, -1,
+			(struct sockaddr *)&server, len));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(connectat_failure, tc)
@@ -587,16 +546,9 @@ ATF_TC_HEAD(accept_success, tc)
 
 ATF_TC_BODY(accept_success, tc)
 {
-	int clientfd;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
+	/* Setup a server socket and bind to the specified address */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
@@ -604,17 +556,16 @@ ATF_TC_BODY(accept_success, tc)
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE((clientfd = accept(sockfd, \
-		(struct sockaddr *)&client, &len)) != -1);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((connectfd = accept(sockfd, NULL, &len)) != -1);
 
-	/* Audit record must contain clientfd & sockfd */
-	snprintf(regex, 60, \
-		"accept.*0x%x.*return,success,%d", sockfd, clientfd);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain connectfd & sockfd */
+	snprintf(extregex, sizeof(extregex),
+			"accept.*0x%x.*return,success,%d", sockfd, connectfd);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
-	close_sockets(3, sockfd, sockfd2, clientfd);
+	close_sockets(3, sockfd, sockfd2, connectfd);
 }
 
 ATF_TC_CLEANUP(accept_success, tc)
@@ -632,16 +583,11 @@ ATF_TC_HEAD(accept_failure, tc)
 
 ATF_TC_BODY(accept_failure, tc)
 {
-	/* Preliminary socket setup */
-	struct sockaddr_un client;
-	len = sizeof(struct sockaddr_un);
-
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "accept.*0x%x.*return,failure", ERROR);
-
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, accept(ERROR, (struct sockaddr *)&client, &len));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "accept.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, accept(-1, NULL, NULL));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(accept_failure, tc)
@@ -659,39 +605,29 @@ ATF_TC_HEAD(send_success, tc)
 
 ATF_TC_BODY(send_success, tc)
 {
-	/* Preliminary socket setup */
-	int clientfd;
-	ssize_t bytes_sent;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
+	/* Setup a server socket and bind to the specified address */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
 	/* Set up "blocking" client and connect with non-blocking server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
-	ATF_REQUIRE((clientfd = accept(sockfd, \
-		(struct sockaddr *)&client, &len)) != -1);
+	ATF_REQUIRE((connectfd = accept(sockfd, NULL, &len)) != -1);
 
 	/* Send a sample message to the connected socket */
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE((bytes_sent = \
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((data_bytes =
 		send(sockfd2, msgbuff, strlen(msgbuff), 0)) != -1);
 
-	/* Audit record must contain sockfd2 and bytes_sent */
-	snprintf(regex, 60, \
-		"send.*0x%x.*return,success,%zd", sockfd2, bytes_sent);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain sockfd2 and data_bytes */
+	snprintf(extregex, sizeof(extregex),
+		"send.*0x%x.*return,success,%zd", sockfd2, data_bytes);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
-	close_sockets(3, sockfd, sockfd2, clientfd);
+	close_sockets(3, sockfd, sockfd2, connectfd);
 }
 
 ATF_TC_CLEANUP(send_success, tc)
@@ -709,11 +645,11 @@ ATF_TC_HEAD(send_failure, tc)
 
 ATF_TC_BODY(send_failure, tc)
 {
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "send.*0x%x.*return,failure", ERROR);
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, send(ERROR, msgbuff, strlen(msgbuff), 0));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "send.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, send(-1, NULL, 0, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(send_failure, tc)
@@ -731,41 +667,30 @@ ATF_TC_HEAD(recv_success, tc)
 
 ATF_TC_BODY(recv_success, tc)
 {
-	/* Preliminary socket setup */
-	int clientfd;
-	ssize_t bytes_recv;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
+	/* Setup a server socket and bind to the specified address */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
 	/* Set up "blocking" client and connect with non-blocking server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
-	ATF_REQUIRE((clientfd = accept(sockfd, \
-		(struct sockaddr *)&client, &len)) != -1);
+	ATF_REQUIRE((connectfd = accept(sockfd, NULL, &len)) != -1);
 	/* Send a sample message to the connected socket */
 	ATF_REQUIRE(send(sockfd2, msgbuff, strlen(msgbuff), 0) != -1);
 
-	/* Receive data once clientfd is ready for reading */
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE(check_readfs(clientfd) != 0);
-	ATF_REQUIRE((bytes_recv = recv(clientfd, data, MAX_DATA, 0)) != 0);
+	/* Receive data once connectfd is ready for reading */
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((data_bytes = recv(connectfd, data, MAX_DATA, 0)) != 0);
 
-	/* Audit record must contain clientfd and bytes_recv */
-	snprintf(regex, 60, \
-		"recv.*0x%x.*return,success,%zd", clientfd, bytes_recv);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain connectfd and data_bytes */
+	snprintf(extregex, sizeof(extregex),
+		"recv.*0x%x.*return,success,%zd", connectfd, data_bytes);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
-	close_sockets(3, sockfd, sockfd2, clientfd);
+	close_sockets(3, sockfd, sockfd2, connectfd);
 }
 
 ATF_TC_CLEANUP(recv_success, tc)
@@ -783,11 +708,11 @@ ATF_TC_HEAD(recv_failure, tc)
 
 ATF_TC_BODY(recv_failure, tc)
 {
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "recv.*0x%x.*return,failure", ERROR);
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, recv(ERROR, data, MAX_DATA, 0));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "recv.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, recv(-1, NULL, 0, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(recv_failure, tc)
@@ -805,39 +730,26 @@ ATF_TC_HEAD(sendto_success, tc)
 
 ATF_TC_BODY(sendto_success, tc)
 {
-	/* Preliminary socket setup */
-	int clientfd;
-	ssize_t bytes_sent;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
-	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
+	/*  Setup a server socket and bind to the specified address */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
-	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
-	/* Set up "blocking" client and connect with non-blocking server */
-	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
-	ATF_REQUIRE((clientfd = accept(sockfd, \
-		(struct sockaddr *)&client, &len)) != -1);
+	/* Set up client socket to be used for sending the data */
+	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 
-	/* Send a sample message to client's address */
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE((bytes_sent = sendto(sockfd2, msgbuff, \
-		strlen(msgbuff), 0, (struct sockaddr *)&client, len)) != -1);
+	/* Send a sample message to server's address */
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((data_bytes = sendto(sockfd2, msgbuff,
+		strlen(msgbuff), 0, (struct sockaddr *)&server, len)) != -1);
 
-	/* Audit record must contain  sockfd2 and bytes_sent */
-	snprintf(regex, 60, \
-		"sendto.*0x%x.*return,success,%zd", sockfd2, bytes_sent);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain sockfd2 and data_bytes */
+	snprintf(extregex, sizeof(extregex),
+		"sendto.*0x%x.*return,success,%zd", sockfd2, data_bytes);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
-	close_sockets(3, sockfd, sockfd2, clientfd);
+	close_sockets(2, sockfd, sockfd2);
 }
 
 ATF_TC_CLEANUP(sendto_success, tc)
@@ -855,16 +767,11 @@ ATF_TC_HEAD(sendto_failure, tc)
 
 ATF_TC_BODY(sendto_failure, tc)
 {
-	/* Preliminary client address setup */
-	struct sockaddr_un client;
-	len  = sizeof(struct sockaddr_un);
-
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "sendto.*0x%x.*return,failure", ERROR);
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, sendto(ERROR, msgbuff, \
-		strlen(msgbuff), 0, (struct sockaddr *)&client, len));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "sendto.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, sendto(-1, NULL, 0, 0, NULL, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(sendto_failure, tc)
@@ -882,42 +789,28 @@ ATF_TC_HEAD(recvfrom_success, tc)
 
 ATF_TC_BODY(recvfrom_success, tc)
 {
-	/* Preliminary socket setup */
-	int clientfd;
-	ssize_t bytes_recv;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
-	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
+	/*  Setup a server socket and bind to the specified address */
+	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
-	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
-	/* Set up "blocking" client and connect with non-blocking server */
-	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
-	ATF_REQUIRE((clientfd = accept(sockfd, \
-		(struct sockaddr *)&client, &len)) != -1);
-	/* Send a sample message to the connected socket */
-	ATF_REQUIRE(send(sockfd2, msgbuff, strlen(msgbuff), 0) != -1);
+	/* Set up client socket to be used for sending the data */
+	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
+	ATF_REQUIRE(sendto(sockfd2, msgbuff, strlen(msgbuff), 0,
+		(struct sockaddr *)&server, len) != -1);
 
-	/* Receive data once clientfd is ready for reading */
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE(check_readfs(clientfd) != 0);
-	ATF_REQUIRE((bytes_recv = recvfrom(clientfd, data, \
-		MAX_DATA, 0, (struct sockaddr *)&client, &len)) != 0);
+	/* Receive data once sockfd is ready for reading */
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((data_bytes = recvfrom(sockfd, data,
+		MAX_DATA, 0, NULL, &len)) != 0);
 
-	/* Audit record must contain clientfd and bytes_recv */
-	snprintf(regex, 60, \
-		"recvfrom.*0x%x.*return,success,%zd", clientfd, bytes_recv);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain sockfd and data_bytes */
+	snprintf(extregex, sizeof(extregex),
+		"recvfrom.*0x%x.*return,success,%zd", sockfd, data_bytes);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
-	close_sockets(3, sockfd, sockfd2, clientfd);
+	close_sockets(2, sockfd, sockfd2);
 }
 
 ATF_TC_CLEANUP(recvfrom_success, tc)
@@ -935,16 +828,11 @@ ATF_TC_HEAD(recvfrom_failure, tc)
 
 ATF_TC_BODY(recvfrom_failure, tc)
 {
-	/* Preliminary client address setup */
-	struct sockaddr_un client;
-	len = sizeof(struct sockaddr_un);
-
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "recvfrom.*0x%x.*return,failure", ERROR);
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, recvfrom(ERROR, data, \
-		MAX_DATA, 0, (struct sockaddr *)&client, &len));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex), "recvfrom.*%s", invalregex);
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, recvfrom(-1, NULL, 0, 0, NULL, NULL));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(recvfrom_failure, tc)
@@ -962,39 +850,26 @@ ATF_TC_HEAD(sendmsg_success, tc)
 
 ATF_TC_BODY(sendmsg_success, tc)
 {
-	/* Preliminary socket setup */
-	ssize_t bytes_sent;
-	struct msghdr sendbuf = {}, recvbuf = {};
-	struct iovec io1, io2;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
 	/* Create a datagram server socket & bind to UNIX address family */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 
 	/* Message buffer to be sent to the server */
 	init_iov(&io1, msgbuff, sizeof(msgbuff));
 	init_msghdr(&sendbuf, &io1, &server);
 
-	/* Prepare buffer to store the received data in */
-	init_iov(&io2, data, MAX_DATA);
-	init_msghdr(&recvbuf, &io2, &client);
-
-	/* Set up "blocking" UDP client to communicate with the server */
+	/* Set up UDP client to communicate with the server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 
 	/* Send a sample message to the specified client address */
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE((bytes_sent = sendmsg(sockfd2, &sendbuf, 0)) != -1);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((data_bytes = sendmsg(sockfd2, &sendbuf, 0)) != -1);
 
-	/* Audit record must contain sockfd2 and bytes_sent */
-	snprintf(regex, 60, \
-		"sendmsg.*0x%x.*return,success,%zd", sockfd2, bytes_sent);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain sockfd2 and data_bytes */
+	snprintf(extregex, sizeof(extregex),
+		"sendmsg.*0x%x.*return,success,%zd", sockfd2, data_bytes);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
 	close_sockets(2, sockfd, sockfd2);
@@ -1015,12 +890,11 @@ ATF_TC_HEAD(sendmsg_failure, tc)
 
 ATF_TC_BODY(sendmsg_failure, tc)
 {
-	struct msghdr msgbuf;
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "sendmsg.*return,failure : Message too long");
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, sendmsg(ERROR, &msgbuf, 0));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex),
+		"sendmsg.*return,failure : Bad address");
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(-1, sendmsg(-1, NULL, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(sendmsg_failure, tc)
@@ -1038,18 +912,9 @@ ATF_TC_HEAD(recvmsg_success, tc)
 
 ATF_TC_BODY(recvmsg_success, tc)
 {
-	/* Preliminary socket setup */
-	ssize_t bytes_recv;
-	struct msghdr sendbuf = {}, recvbuf = {};
-	struct iovec io1, io2;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
 	/* Create a datagram server socket & bind to UNIX address family */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 
 	/* Message buffer to be sent to the server */
@@ -1057,23 +922,22 @@ ATF_TC_BODY(recvmsg_success, tc)
 	init_msghdr(&sendbuf, &io1, &server);
 
 	/* Prepare buffer to store the received data in */
-	init_iov(&io2, data, MAX_DATA);
-	init_msghdr(&recvbuf, &io2, &client);
+	init_iov(&io2, data, sizeof(data));
+	init_msghdr(&recvbuf, &io2, NULL);
 
-	/* Set up "blocking" UDP client to communicate with the server */
+	/* Set up UDP client to communicate with the server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_DGRAM, 0)) != -1);
 	/* Send a sample message to the connected socket */
 	ATF_REQUIRE(sendmsg(sockfd2, &sendbuf, 0) != -1);
 
 	/* Receive data once clientfd is ready for reading */
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE(check_readfs(sockfd) != 0);
-	ATF_REQUIRE((bytes_recv = recvmsg(sockfd, &recvbuf, 0)) != -1);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((data_bytes = recvmsg(sockfd, &recvbuf, 0)) != -1);
 
-	/* Audit record must contain sockfd and bytes_recv */
-	snprintf(regex, 60, \
-		"recvmsg.*0x%x.*return,success,%zd", sockfd, bytes_recv);
-	check_audit(fds, regex, pipefd);
+	/* Audit record must contain sockfd and data_bytes */
+	snprintf(extregex, sizeof(extregex),
+		"recvmsg.*%#x.*return,success,%zd", sockfd, data_bytes);
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
 	close_sockets(2, sockfd, sockfd2);
@@ -1094,19 +958,17 @@ ATF_TC_HEAD(recvmsg_failure, tc)
 
 ATF_TC_BODY(recvmsg_failure, tc)
 {
-	struct msghdr msgbuf;
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "recvmsg.*return,failure : Message too long");
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, recvmsg(ERROR, &msgbuf, 0));
-	check_audit(fds, regex, pipefd);
+	snprintf(extregex, sizeof(extregex),
+		"recvmsg.*return,failure : Bad address");
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(-1, recvmsg(-1, NULL, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(recvmsg_failure, tc)
 {
 	cleanup();
 }
-
 
 
 ATF_TC_WITH_CLEANUP(shutdown_success);
@@ -1118,34 +980,27 @@ ATF_TC_HEAD(shutdown_success, tc)
 
 ATF_TC_BODY(shutdown_success, tc)
 {
-	int clientfd;
-	struct sockaddr_un server, client;
 	assign_address(&server);
-	len = sizeof(struct sockaddr_un);
-
-	/* Server Socket: Assign address and listen for connection */
+	/* Setup server socket and bind to the specified address */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Non-blocking server socket */
-	ATF_REQUIRE(fcntl(sockfd, F_SETFL, O_NONBLOCK) != -1);
-	/* Bind to the specified address and wait for connection */
 	ATF_REQUIRE_EQ(0, bind(sockfd, (struct sockaddr *)&server, len));
 	ATF_REQUIRE_EQ(0, listen(sockfd, 1));
 
-	/* Set up "blocking" client and connect with non-blocking server */
+	/* Setup client and connect with the blocking server */
 	ATF_REQUIRE((sockfd2 = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
 	ATF_REQUIRE_EQ(0, connect(sockfd2, (struct sockaddr *)&server, len));
-	ATF_REQUIRE((clientfd = accept(sockfd, \
-		(struct sockaddr *)&client, &len)) != -1);
+	ATF_REQUIRE((connectfd = accept(sockfd, NULL, &len)) != -1);
 
 	/* Audit record must contain clientfd */
-	snprintf(regex, 60, "shutdown.*0x%x.*return,success", clientfd);
+	snprintf(extregex, sizeof(extregex),
+		"shutdown.*%#x.*return,success", connectfd);
 
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(0, shutdown(clientfd, SHUT_RDWR));
-	check_audit(fds, regex, pipefd);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, shutdown(connectfd, SHUT_RDWR));
+	check_audit(fds, extregex, pipefd);
 
 	/* Close all socket descriptors */
-	close_sockets(3, sockfd, sockfd2, clientfd);
+	close_sockets(3, sockfd, sockfd2, connectfd);
 }
 
 ATF_TC_CLEANUP(shutdown_success, tc)
@@ -1163,11 +1018,14 @@ ATF_TC_HEAD(shutdown_failure, tc)
 
 ATF_TC_BODY(shutdown_failure, tc)
 {
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "shutdown.*0x%x.*return,failure", ERROR);
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, shutdown(ERROR, SHUT_RDWR));
-	check_audit(fds, regex, pipefd);
+	pid = getpid();
+	snprintf(extregex, sizeof(extregex),
+		"shutdown.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid socket descriptor */
+	ATF_REQUIRE_EQ(-1, shutdown(-1, SHUT_RDWR));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(shutdown_failure, tc)
@@ -1186,16 +1044,19 @@ ATF_TC_HEAD(sendfile_success, tc)
 ATF_TC_BODY(sendfile_success, tc)
 {
 	int filedesc;
-	filedesc = open(path, O_CREAT | O_RDONLY, mode);
+	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDONLY, mode)) != -1);
 	/* Create a simple UNIX socket to send out random data */
 	ATF_REQUIRE((sockfd = socket(PF_UNIX, SOCK_STREAM, 0)) != -1);
-	/* Check the presence of sockfd,non-file in the audit record */
-	snprintf(regex, 60, "sendfile.*0x%x,non-file.*return,success", filedesc);
+	/* Check the presence of sockfd, non-file in the audit record */
+	snprintf(extregex, sizeof(extregex),
+		"sendfile.*%#x,non-file.*return,success", filedesc);
 
-	FILE *pipefd = setup(fds, "nt");
+	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, sendfile(filedesc, sockfd, 0, 0, NULL, NULL, 0));
-	check_audit(fds, regex, pipefd);
-	close(sockfd);
+	check_audit(fds, extregex, pipefd);
+
+	/* Teardown socket and file descriptors */
+	close_sockets(2, sockfd, filedesc);
 }
 
 ATF_TC_CLEANUP(sendfile_success, tc)
@@ -1213,11 +1074,12 @@ ATF_TC_HEAD(sendfile_failure, tc)
 
 ATF_TC_BODY(sendfile_failure, tc)
 {
-	/* Audit record must contain Hex(-1) */
-	snprintf(regex, 60, "sendfile.*0x%x.*return,failure", ERROR);
-	FILE *pipefd = setup(fds, "nt");
-	ATF_REQUIRE_EQ(-1, sendfile(ERROR, ERROR, 0, 0, NULL, NULL, 0));
-	check_audit(fds, regex, pipefd);
+	pid = getpid();
+	snprintf(extregex, sizeof(extregex),
+		"sendfile.*%d.*return,failure", pid);
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(-1, sendfile(-1, -1, 0, 0, NULL, NULL, 0));
+	check_audit(fds, extregex, pipefd);
 }
 
 ATF_TC_CLEANUP(sendfile_failure, tc)

@@ -3,7 +3,7 @@ An implementation of regression testsuite for FreeBSD's audit subsystem. Made as
 **For a complete overview and further updates on the project, checkout the [Project Wiki](https://wiki.freebsd.org/SummerOfCode2018Projects/RegressionTestSuiteForAuditFramework)**.
 
 ## Overview
-FreeBSD is a rapidly developing operating system with an extreme focus on advanced security & networking features. For an OS with a widespread usage and development, testing and monitoring of security regressions becomes a critical measure. FreeBSD has an audit subsystem which is responsible for monitoring a variety of security-relevant system events, such as user-logins, configuration changes, file system & network access. Although the audit framework is indispensable for security conscious organisations running FreeBSD servers, currently there is no tool to test its reliability and the intended behaviour.
+FreeBSD is a rapidly developing operating system with an extreme focus on advanced security & networking features. For an OS with a widespread usage and development, testing and monitoring of security regressions becomes a critical measure. FreeBSD has an audit subsystem which is responsible for monitoring a variety of security-relevant system events, such as user-logins, configuration changes, file system & network access. Although the audit framework is indispensable for security conscious organizations running FreeBSD servers, currently there is no tool to test its reliability and the intended behaviour.
 
 ## Project Description
 The project aims to develop a regression test-suite, which will evaluate the audit framework for proper logging of most auditable system calls classified in TCP/IP & UDP sockets, File I/O, process control and device management, along with the semantics of audit trail's BSM/XML/text output.
@@ -98,6 +98,10 @@ These are the three pre-SoC reports outlining the initial approach on building a
 |2016  | [TCP-IP Test-Suite](https://github.com/shivansh/TCP-IP-Regression-TestSuite) | Shivansh Rai |
 |2017  | [Smoke Test-Suite](https://github.com/shivansh/smoketestsuite) | Shivansh Rai |
 |2018  | [Audit Test-Suite](https://github.com/aniketp/AuditTestSuite) | Aniket Pandey |
+
+External repositories involved in the project apart from [freebsd source](https://github.com/freebsd/freebsd.git)
+* [jmmv/kyua](https://github.com/jmmv/kyua.git)
+* [openbsm/openbsm](https://github.com/openbsm/openbsm.git)
 
 ## License
 This project is licensed under the BSD-2-Clause License - see the [LICENSE](./LICENSE) file for details.

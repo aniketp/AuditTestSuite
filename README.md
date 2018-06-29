@@ -25,7 +25,7 @@ These tests can be run independently since Kyua enables standalone testing, or t
  cd /usr/tests/usr.sbin/praudit
  kyua test [praudit_test]
 ```
-A general report of a test-run can be found in [TEST-RESULT](./TEST-RESULT). This is the state after [r335528](https://github.com/freebsd/freebsd/commit/d6756a3ac89ba333338112b1fe9813d3bc6362e9)
+A general report of a test-run can be found in [TEST-RESULT](./TEST-RESULT). This is the state after [r335791](https://github.com/freebsd/freebsd/commit/0a8d0ed4e54a09aae844be71327941cf3cd401a5)
 
 **Note**: Port `devel/kyua` needs to be present in the base system along with the `ATF` (Automated Testing Framework) libraries (which come pre-installed with 12-CURRENT). <br/>
 * Install Kyua with the FreeBSD package management tool, `pkg(7)`

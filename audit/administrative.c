@@ -31,12 +31,17 @@
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
+#include <sys/timespec.h>
 #include <sys/timex.h>
+
+#include <bsm/audit.h>
+#include <bsm/audit_kevents.h>
 #include <ufs/ufs/quota.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -103,6 +108,60 @@ ATF_TC_BODY(settimeofday_failure, tc)
 }
 
 ATF_TC_CLEANUP(settimeofday_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(clock_settime_success);
+ATF_TC_HEAD(clock_settime_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"clock_settime(2) call");
+}
+
+ATF_TC_BODY(clock_settime_success, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "clock_settime.*%d.*success", pid);
+
+	struct timespec tp;
+	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_REALTIME, &tp));
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Setting the same time as obtained by clock_gettime(2) */
+	ATF_REQUIRE_EQ(0, clock_settime(CLOCK_REALTIME, &tp));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(clock_settime_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(clock_settime_failure);
+ATF_TC_HEAD(clock_settime_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"clock_settime(2) call");
+}
+
+ATF_TC_BODY(clock_settime_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "clock_settime.*%d.*failure", pid);
+
+	struct timespec tp;
+	ATF_REQUIRE_EQ(0, clock_gettime(CLOCK_MONOTONIC, &tp));
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: cannot use CLOCK_MONOTONIC to set the system time */
+	ATF_REQUIRE_EQ(-1, clock_settime(CLOCK_MONOTONIC, &tp));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(clock_settime_failure, tc)
 {
 	cleanup();
 }
@@ -218,7 +277,7 @@ ATF_TC_BODY(nfs_getfh_success, tc)
 	snprintf(adregex, sizeof(adregex), "nfs_getfh.*%d.*ret.*success", pid);
 
 	/* File needs to exist to call getfh(2) */
-	ATF_REQUIRE(filedesc = open(path, O_CREAT, mode) != -1);
+	ATF_REQUIRE((filedesc = open(path, O_CREAT, mode)) != -1);
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, getfh(path, &fhp));
 	check_audit(fds, adregex, pipefd);
@@ -274,6 +333,12 @@ ATF_TC_BODY(auditctl_success, tc)
 
 ATF_TC_CLEANUP(auditctl_success, tc)
 {
+	/*
+	 * auditctl(2) disables audit log at /var/audit and initiates auditing
+	 * at the configured path. To reset this, we need to stop and start the
+	 * auditd(8) again. Here, we check if auditd(8) was running already
+	 * before the test started. If so, we stop and start it again.
+	 */
 	system("service auditd onestop > /dev/null 2>&1");
 	if (!atf_utils_file_exists("started_auditd"))
 		system("service auditd onestart > /dev/null 2>&1");
@@ -304,6 +369,57 @@ ATF_TC_CLEANUP(auditctl_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(auditon_success);
+ATF_TC_HEAD(auditon_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"auditon(2) call");
+}
+
+ATF_TC_BODY(auditon_success, tc)
+{
+	pid = getpid();
+	au_evclass_map_t evclass;
+	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+
+	/* Initialize evclass to get the event-class mapping for auditon(2) */
+	evclass.ec_number = AUE_AUDITON;
+	evclass.ec_class = 0;
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, auditon(A_GETCLASS, &evclass, sizeof(&evclass)));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(auditon_success, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(auditon_failure);
+ATF_TC_HEAD(auditon_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"auditon(2) call");
+}
+
+ATF_TC_BODY(auditon_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Invalid au_evclass_map_t structure */
+	ATF_REQUIRE_EQ(-1, auditon(A_GETCLASS, NULL, 0));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(auditon_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TC_WITH_CLEANUP(acct_success);
 ATF_TC_HEAD(acct_success, tc)
 {
@@ -313,50 +429,45 @@ ATF_TC_HEAD(acct_success, tc)
 
 ATF_TC_BODY(acct_success, tc)
 {
-	int acctinfo;
+	int acctinfo, filedesc2;
 	size_t len = sizeof(acctinfo);
-	const char *acctpath = NULL;
-	const char *acctregex = "accounting off";
 	const char *acctname = "kern.acct_configured";
 	ATF_REQUIRE_EQ(0, sysctlbyname(acctname, &acctinfo, &len, NULL, 0));
+
+	/* File needs to exist to start system accounting */
+	ATF_REQUIRE((filedesc = open(path, O_CREAT | O_RDWR, mode)) != -1);
 
 	/*
 	 * acctinfo = 0: System accounting was disabled
 	 * acctinfo = 1: System accounting was enabled
 	 */
 	if (acctinfo) {
-		acctpath = "fileforacctaudit";
-		acctregex = "fileforacctaudit";
-		/* File needs to exist to start system accounting */
-		ATF_REQUIRE((filedesc =
-			open(acctpath, O_CREAT | O_RDWR, mode)) != -1);
+		ATF_REQUIRE((filedesc2 = open("acct_ok", O_CREAT, mode)) != -1);
+		close(filedesc2);
 	}
 
 	pid = getpid();
 	snprintf(adregex, sizeof(adregex),
-		"acct.*%s.*%d.*ret.*success", acctregex, pid);
+		"acct.*%s.*%d.*return,success", path, pid);
 
 	/*
-	 * If system accouting was disabled before, we don't enable it
-	 * (by passing NULL as acctpath)
-	 * If it was enabled, we temporarily switch the accounting record to
+	 * We temporarily switch the accounting record to a file at
 	 * our own configured path in order to confirm acct(2)'s successful
 	 * auditing. Then we set everything back to its original state.
 	 */
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, acct(acctpath));
+	ATF_REQUIRE_EQ(0, acct(path));
 	check_audit(fds, adregex, pipefd);
-
-	/* Reset accounting configured path */
-	if (acctinfo) {
-		close(filedesc);
-		ATF_REQUIRE_EQ(0, system("service accounting onestop"));
-		ATF_REQUIRE_EQ(0, system("service accounting onestart"));
-	}
+	close(filedesc);
 }
 
 ATF_TC_CLEANUP(acct_success, tc)
 {
+	/* Reset accounting configured path */
+	ATF_REQUIRE_EQ(0, system("service accounting onestop"));
+	if (atf_utils_file_exists("acct_ok")) {
+		ATF_REQUIRE_EQ(0, system("service accounting onestart"));
+	}
 	cleanup();
 }
 
@@ -738,12 +849,6 @@ ATF_TC_CLEANUP(quotactl_failure, tc)
 }
 
 
-/*
- * Audit of mount(2) and nmount(2) cannot be tested in normal
- * conditions as we are not allowed to mount a filesystem.
- */
-
-
 ATF_TC_WITH_CLEANUP(mount_failure);
 ATF_TC_HEAD(mount_failure, tc)
 {
@@ -790,10 +895,60 @@ ATF_TC_CLEANUP(nmount_failure, tc)
 }
 
 
+ATF_TC_WITH_CLEANUP(swapon_failure);
+ATF_TC_HEAD(swapon_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"swapon(2) call");
+}
+
+ATF_TC_BODY(swapon_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "swapon.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Block device required */
+	ATF_REQUIRE_EQ(-1, swapon(path));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(swapon_failure, tc)
+{
+	cleanup();
+}
+
+
+ATF_TC_WITH_CLEANUP(swapoff_failure);
+ATF_TC_HEAD(swapoff_failure, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of an unsuccessful "
+					"swapoff(2) call");
+}
+
+ATF_TC_BODY(swapoff_failure, tc)
+{
+	pid = getpid();
+	snprintf(adregex, sizeof(adregex), "swapoff.*%d.*return,failure", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	/* Failure reason: Block device required */
+	ATF_REQUIRE_EQ(-1, swapoff(path));
+	check_audit(fds, adregex, pipefd);
+}
+
+ATF_TC_CLEANUP(swapoff_failure, tc)
+{
+	cleanup();
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, settimeofday_success);
 	ATF_TP_ADD_TC(tp, settimeofday_failure);
+	ATF_TP_ADD_TC(tp, clock_settime_success);
+	ATF_TP_ADD_TC(tp, clock_settime_failure);
 	ATF_TP_ADD_TC(tp, adjtime_success);
 	ATF_TP_ADD_TC(tp, adjtime_failure);
 	ATF_TP_ADD_TC(tp, ntp_adjtime_success);
@@ -801,10 +956,13 @@ ATF_TP_ADD_TCS(tp)
 
 	ATF_TP_ADD_TC(tp, nfs_getfh_success);
 	ATF_TP_ADD_TC(tp, nfs_getfh_failure);
-	ATF_TP_ADD_TC(tp, auditctl_success);
-	ATF_TP_ADD_TC(tp, auditctl_failure);
 	ATF_TP_ADD_TC(tp, acct_success);
 	ATF_TP_ADD_TC(tp, acct_failure);
+
+	ATF_TP_ADD_TC(tp, auditctl_success);
+	ATF_TP_ADD_TC(tp, auditctl_failure);
+	ATF_TP_ADD_TC(tp, auditon_success);
+	ATF_TP_ADD_TC(tp, auditon_failure);
 
 	ATF_TP_ADD_TC(tp, getauid_success);
 	ATF_TP_ADD_TC(tp, getauid_failure);
@@ -825,6 +983,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, quotactl_failure);
 	ATF_TP_ADD_TC(tp, mount_failure);
 	ATF_TP_ADD_TC(tp, nmount_failure);
+	ATF_TP_ADD_TC(tp, swapon_failure);
+	ATF_TP_ADD_TC(tp, swapoff_failure);
 
 	return (atf_no_error());
 }

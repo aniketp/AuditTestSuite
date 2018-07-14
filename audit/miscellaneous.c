@@ -29,24 +29,59 @@
 #include <sys/sysctl.h>
 
 #include <bsm/audit.h>
+#include <bsm/libbsm.h>
 #include <machine/sysarch.h>
 
 #include <atf-c.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "utils.h"
+#define MAXLEN 80
 
 static pid_t pid;
 static void *sysarg;
-static char miscreg[80];
+static char miscreg[MAXLEN];
 static struct pollfd fds[1];
 static const char *auclass = "ot";
 
 
-/*
- * Success case of audit(2) is skipped for now as the behaviour is quite
- * undeterministic. It will be added when the intermittency is resolved.
- */
+ATF_TC_WITH_CLEANUP(audit_success);
+ATF_TC_HEAD(audit_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"audit(2) call");
+}
+
+ATF_TC_BODY(audit_success, tc)
+{
+	FILE *fileptr;
+	uint8_t *buff;
+	tokenstr_t token;
+	int reclen, bytesread = 0;
+
+	ATF_REQUIRE((fileptr = fopen("/root/test/trail", "r")) != NULL);
+	ATF_REQUIRE((reclen = au_read_rec(fileptr, &buff)) != -1);
+	while (bytesread < reclen) {
+		ATF_REQUIRE_EQ(0, au_fetch_tok(&token,
+			buff + bytesread, reclen - bytesread));
+		bytesread += token.len;
+	}
+	fclose(fileptr);
+
+	pid = getpid();
+	snprintf(miscreg, sizeof(miscreg), "audit.*%d.*return,success", pid);
+
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE_EQ(0, audit(buff, MAXLEN));
+	//free(buff);
+	check_audit(fds, miscreg, pipefd);
+}
+
+ATF_TC_CLEANUP(audit_success, tc)
+{
+	cleanup();
+}
 
 
 ATF_TC_WITH_CLEANUP(audit_failure);
@@ -254,6 +289,7 @@ ATF_TC_CLEANUP(sysctl_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, audit_success);
 	ATF_TP_ADD_TC(tp, audit_failure);
 
 #ifdef I386_GET_LDT

@@ -751,7 +751,7 @@ ATF_TC_BODY(auditon_getpolicy_success, tc)
 {
 	int *aupolicy = (int *)malloc(sizeof(int));
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "GPOLICY command.*%d.*success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, auditon(A_GETPOLICY, aupolicy, sizeof(aupolicy)));
@@ -774,7 +774,7 @@ ATF_TC_HEAD(auditon_getpolicy_failure, tc)
 ATF_TC_BODY(auditon_getpolicy_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "GPOLICY command.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid argument */
@@ -799,7 +799,7 @@ ATF_TC_BODY(auditon_setpolicy_success, tc)
 {
 	int *aupolicy = (int *)malloc(sizeof(int));
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "SPOLICY command.*%d.*success", pid);
 
 	/* Retrieve the current auditing policy, to be used with A_SETPOLICY */
 	ATF_REQUIRE_EQ(0, auditon(A_GETPOLICY, aupolicy, sizeof(aupolicy)));
@@ -824,7 +824,7 @@ ATF_TC_HEAD(auditon_setpolicy_failure, tc)
 ATF_TC_BODY(auditon_setpolicy_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "SPOLICY command.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid argument */
@@ -849,11 +849,11 @@ ATF_TC_BODY(auditon_getkmask_success, tc)
 {
 	pid = getpid();
 	au_mask_t evmask;
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "get kernel mask.*%d.*success", pid);
 
 	bzero(&evmask, sizeof(evmask));
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &evmask, sizeof(&evmask)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &evmask, sizeof(evmask)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -873,7 +873,7 @@ ATF_TC_HEAD(auditon_getkmask_failure, tc)
 ATF_TC_BODY(auditon_getkmask_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "get kernel mask.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid au_mask_t structure */
@@ -898,14 +898,14 @@ ATF_TC_BODY(auditon_setkmask_success, tc)
 {
 	pid = getpid();
 	au_mask_t evmask;
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "set kernel mask.*%d.*success", pid);
 
 	/* Retrieve the current audit mask to be used with A_SETKMASK */
 	bzero(&evmask, sizeof(evmask));
-	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &evmask, sizeof(&evmask)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &evmask, sizeof(evmask)));
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_SETKMASK, &evmask, sizeof(&evmask)));
+	ATF_REQUIRE_EQ(0, auditon(A_SETKMASK, &evmask, sizeof(evmask)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -925,7 +925,7 @@ ATF_TC_HEAD(auditon_setkmask_failure, tc)
 ATF_TC_BODY(auditon_setkmask_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "set kernel mask.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid au_mask_t structure */
@@ -950,7 +950,7 @@ ATF_TC_BODY(auditon_getqctrl_success, tc)
 {
 	pid = getpid();
 	au_qctrl_t evqctrl;
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "GQCTRL command.*%d.*success", pid);
 
 	bzero(&evqctrl, sizeof(evqctrl));
 	FILE *pipefd = setup(fds, auclass);
@@ -974,7 +974,7 @@ ATF_TC_HEAD(auditon_getqctrl_failure, tc)
 ATF_TC_BODY(auditon_getqctrl_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "GQCTRL command.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid au_qctrl_t structure */
@@ -999,7 +999,7 @@ ATF_TC_BODY(auditon_setqctrl_success, tc)
 {
 	pid = getpid();
 	au_qctrl_t evqctrl;
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "SQCTRL command.*%d.*success", pid);
 
 	/* Retrieve the current audit mask to be used with A_SETQCTRL */
 	bzero(&evqctrl, sizeof(evqctrl));
@@ -1026,11 +1026,11 @@ ATF_TC_HEAD(auditon_setqctrl_failure, tc)
 ATF_TC_BODY(auditon_setqctrl_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "SQCTRL command.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid au_qctrl_t structure */
-	ATF_REQUIRE_EQ(-1, auditon(A_SETKMASK, NULL, 0));
+	ATF_REQUIRE_EQ(-1, auditon(A_SETQCTRL, NULL, 0));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -1051,13 +1051,13 @@ ATF_TC_BODY(auditon_getclass_success, tc)
 {
 	pid = getpid();
 	au_evclass_map_t evclass;
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "get event class.*%d.*success", pid);
 
 	/* Initialize evclass to get the event-class mapping for auditon(2) */
 	evclass.ec_number = AUE_AUDITON;
 	evclass.ec_class = 0;
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_GETCLASS, &evclass, sizeof(&evclass)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETCLASS, &evclass, sizeof(evclass)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -1077,7 +1077,7 @@ ATF_TC_HEAD(auditon_getclass_failure, tc)
 ATF_TC_BODY(auditon_getclass_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "get event class.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid au_evclass_map_t structure */
@@ -1102,15 +1102,15 @@ ATF_TC_BODY(auditon_setclass_success, tc)
 {
 	pid = getpid();
 	au_evclass_map_t evclass;
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "set event class.*%d.*success", pid);
 
 	/* Initialize evclass and get the event-class mapping for auditon(2) */
 	evclass.ec_number = AUE_AUDITON;
 	evclass.ec_class = 0;
-	ATF_REQUIRE_EQ(0, auditon(A_GETCLASS, &evclass, sizeof(&evclass)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETCLASS, &evclass, sizeof(evclass)));
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_SETCLASS, &evclass, sizeof(&evclass)));
+	ATF_REQUIRE_EQ(0, auditon(A_SETCLASS, &evclass, sizeof(evclass)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -1130,7 +1130,7 @@ ATF_TC_HEAD(auditon_setclass_failure, tc)
 ATF_TC_BODY(auditon_setclass_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "set event class.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid au_evclass_map_t structure */
@@ -1155,7 +1155,7 @@ ATF_TC_BODY(auditon_getcond_success, tc)
 {
 	int *auditcond = (int *)malloc(sizeof(int));
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "get audit state.*%d.*success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, auditcond, sizeof(auditcond)));
@@ -1178,7 +1178,7 @@ ATF_TC_HEAD(auditon_getcond_failure, tc)
 ATF_TC_BODY(auditon_getcond_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "get audit state.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid argument */
@@ -1203,7 +1203,7 @@ ATF_TC_BODY(auditon_setcond_success, tc)
 {
 	int *auditcond = (int *)malloc(sizeof(int));
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,success", pid);
+	snprintf(adregex, sizeof(adregex), "set audit state.*%d.*success", pid);
 
 	/* Retrieve the current state of auditing, to be used with A_SETCOND */
 	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, auditcond, sizeof(auditcond)));
@@ -1228,7 +1228,7 @@ ATF_TC_HEAD(auditon_setcond_failure, tc)
 ATF_TC_BODY(auditon_setcond_failure, tc)
 {
 	pid = getpid();
-	snprintf(adregex, sizeof(adregex), "auditon.*%d.*return,failure", pid);
+	snprintf(adregex, sizeof(adregex), "set audit state.*%d.*failure", pid);
 
 	FILE *pipefd = setup(fds, auclass);
 	/* Failure reason: Invalid argument */

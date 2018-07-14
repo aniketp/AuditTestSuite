@@ -29,59 +29,23 @@
 #include <sys/sysctl.h>
 
 #include <bsm/audit.h>
-#include <bsm/libbsm.h>
 #include <machine/sysarch.h>
 
 #include <atf-c.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include "utils.h"
-#define MAXLEN 80
 
 static pid_t pid;
-static void *sysarg;
-static char miscreg[MAXLEN];
+static char miscreg[80];
 static struct pollfd fds[1];
 static const char *auclass = "ot";
 
 
-ATF_TC_WITH_CLEANUP(audit_success);
-ATF_TC_HEAD(audit_success, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-					"audit(2) call");
-}
-
-ATF_TC_BODY(audit_success, tc)
-{
-	FILE *fileptr;
-	uint8_t *buff;
-	tokenstr_t token;
-	int reclen, bytesread = 0;
-
-	ATF_REQUIRE((fileptr = fopen("/root/test/trail", "r")) != NULL);
-	ATF_REQUIRE((reclen = au_read_rec(fileptr, &buff)) != -1);
-	while (bytesread < reclen) {
-		ATF_REQUIRE_EQ(0, au_fetch_tok(&token,
-			buff + bytesread, reclen - bytesread));
-		bytesread += token.len;
-	}
-	fclose(fileptr);
-
-	pid = getpid();
-	snprintf(miscreg, sizeof(miscreg), "audit.*%d.*return,success", pid);
-
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, audit(buff, MAXLEN));
-	//free(buff);
-	check_audit(fds, miscreg, pipefd);
-}
-
-ATF_TC_CLEANUP(audit_success, tc)
-{
-	cleanup();
-}
+/*
+ * Success case of audit(2) is skipped for now as the behaviour is quite
+ * undeterministic. It will be added when the intermittency is resolved.
+ */
 
 
 ATF_TC_WITH_CLEANUP(audit_failure);
@@ -108,104 +72,64 @@ ATF_TC_CLEANUP(audit_failure, tc)
 }
 
 
-#ifdef I386_GET_LDT
-ATF_TC_WITH_CLEANUP(sysarch_i386_success);
-ATF_TC_HEAD(sysarch_i386_success, tc)
+ATF_TC_WITH_CLEANUP(sysarch_success);
+ATF_TC_HEAD(sysarch_success, tc)
 {
 	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-					"sysarch(2) call on i386 architecture");
+					"sysarch(2) call");
 }
 
-ATF_TC_BODY(sysarch_i386_success, tc)
+ATF_TC_BODY(sysarch_success, tc)
 {
+	int sysnum = 0;
 	pid = getpid();
 	snprintf(miscreg, sizeof(miscreg), "sysarch.*%d.*return,success", pid);
 
+	/* Set sysnum to the syscall corresponding to the system architecture */
+#if defined(I386_GET_LDT)		/* i386 */
+	sysnum = I386_GET_LDT;
+#elif defined(AMD64_GET_FSBASE)		/* amd64 */
+	sysnum = AMD64_GET_FSBASE;
+#elif defined(MIPS_GET_TLS)		/* MIPS */
+	sysnum = MIPS_GET_TLS;
+#elif defined(ARM_GET_VFPSTATE)		/* ARM */
+	sysnum = ARM_GET_VFPSTATE;
+#elif defined(SPARC_UTRAP_INSTALL)	/* Sparc64 */
+	sysnum = SPARC_UTRAP_INSTALL;
+
+	struct sparc_utrap_args handler {
+		.type		= UT_DIVISION_BY_ZERO,
+		/* We don't want to change the previous handlers */
+		.new_precise	= UTH_NOCHANGE,
+		.new_deferred	= UTH_NOCHANGE,
+		.old_precise	= NULL,
+		.old_deferred	= NULL
+	};
+
+	struct sparc_utrap_install_args sparc64arg {
+		.num 		= ST_DIVISION_BY_ZERO,
+		.handlers	= &handler
+	};
+#else
+	/* For PowerPC, ARM64, RISCV archs, sysarch(2) is not supported */
+	atf_tc_skip("sysarch(2) is not supported for the system architecture");
+#endif
+
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, sysarch(I386_GET_LDT, &sysarg));
+#if defined(SPARC_UTRAP_INSTALL)
+	ATF_REQUIRE_EQ(0, sysarch(sysnum, &sparc64arg));
+#else
+	/* Since we're just retrieving information, a (void *) arg would do */
+	void *sysarg;
+	ATF_REQUIRE_EQ(0, sysarch(sysnum, &sysarg));
+#endif
 	check_audit(fds, miscreg, pipefd);
 }
 
-ATF_TC_CLEANUP(sysarch_i386_success, tc)
+ATF_TC_CLEANUP(sysarch_success, tc)
 {
 	cleanup();
 }
-#endif
-
-
-#ifdef AMD64_GET_FSBASE
-ATF_TC_WITH_CLEANUP(sysarch_amd64_success);
-ATF_TC_HEAD(sysarch_amd64_success, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-				       "sysarch(2) call on AMD64 architecture");
-}
-
-ATF_TC_BODY(sysarch_amd64_success, tc)
-{
-	pid = getpid();
-	snprintf(miscreg, sizeof(miscreg), "sysarch.*%d.*return,success", pid);
-
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, sysarch(AMD64_GET_FSBASE, &sysarg));
-	check_audit(fds, miscreg, pipefd);
-}
-
-ATF_TC_CLEANUP(sysarch_amd64_success, tc)
-{
-	cleanup();
-}
-#endif
-
-
-#ifdef MIPS_GET_TLS
-ATF_TC_WITH_CLEANUP(sysarch_mips_success);
-ATF_TC_HEAD(sysarch_mips_success, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-				       "sysarch(2) call on MIPS architecture");
-}
-
-ATF_TC_BODY(sysarch_mips_success, tc)
-{
-	pid = getpid();
-	snprintf(miscreg, sizeof(miscreg), "sysarch.*%d.*return,success", pid);
-
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, sysarch(MIPS_GET_TLS, &sysarg));
-	check_audit(fds, miscreg, pipefd);
-}
-
-ATF_TC_CLEANUP(sysarch_mips_success, tc)
-{
-	cleanup();
-}
-#endif
-
-
-#ifdef ARM_GET_VFPSTATE
-ATF_TC_WITH_CLEANUP(sysarch_arm_success);
-ATF_TC_HEAD(sysarch_arm_success, tc)
-{
-	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
-				       "sysarch(2) call on ARM architecture");
-}
-
-ATF_TC_BODY(sysarch_arm_success, tc)
-{
-	pid = getpid();
-	snprintf(miscreg, sizeof(miscreg), "sysarch.*%d.*return,success", pid);
-
-	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, sysarch(ARM_GET_VFPSTATE, &sysarg));
-	check_audit(fds, miscreg, pipefd);
-}
-
-ATF_TC_CLEANUP(sysarch_arm_success, tc)
-{
-	cleanup();
-}
-#endif
 
 
 ATF_TC_WITH_CLEANUP(sysarch_failure);
@@ -289,22 +213,9 @@ ATF_TC_CLEANUP(sysctl_failure, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
-	ATF_TP_ADD_TC(tp, audit_success);
 	ATF_TP_ADD_TC(tp, audit_failure);
 
-#ifdef I386_GET_LDT
-	ATF_TP_ADD_TC(tp, sysarch_i386_success);
-#endif
-#ifdef AMD64_GET_FSBASE
-	ATF_TP_ADD_TC(tp, sysarch_amd64_success);
-#endif
-#ifdef MIPS_GET_TLS
-	ATF_TP_ADD_TC(tp, sysarch_mips_success);
-#endif
-#ifdef ARM_GET_VFPSTATE
-	ATF_TP_ADD_TC(tp, sysarch_arm_success);
-#endif
-
+	ATF_TP_ADD_TC(tp, sysarch_success);
 	ATF_TP_ADD_TC(tp, sysarch_failure);
 
 	ATF_TP_ADD_TC(tp, sysctl_success);

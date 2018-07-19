@@ -87,6 +87,35 @@ ATF_TC_CLEANUP(fork_success, tc)
  */
 
 
+ATF_TC_WITH_CLEANUP(_exit_success);
+ATF_TC_HEAD(_exit_success, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Tests the audit of a successful "
+					"_exit(2) call");
+}
+
+ATF_TC_BODY(_exit_success, tc)
+{
+	FILE *pipefd = setup(fds, auclass);
+	ATF_REQUIRE((pid = fork()) != -1);
+	if (pid) {
+		snprintf(pcregex, sizeof(pcregex), "exit.*%d.*success", pid);
+		check_audit(fds, pcregex, pipefd);
+	}
+	else
+		_exit(0);
+}
+
+ATF_TC_CLEANUP(_exit_success, tc)
+{
+	cleanup();
+}
+
+/*
+ * _exit(2) never returns, hence the auditing by default is always successful
+ */
+
+
 ATF_TC_WITH_CLEANUP(rfork_success);
 ATF_TC_HEAD(rfork_success, tc)
 {
@@ -1571,6 +1600,7 @@ ATF_TC_CLEANUP(cap_getmode_failure, tc)
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, fork_success);
+	ATF_TP_ADD_TC(tp, _exit_success);
 	ATF_TP_ADD_TC(tp, rfork_success);
 	ATF_TP_ADD_TC(tp, rfork_failure);
 

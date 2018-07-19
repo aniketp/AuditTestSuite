@@ -81,23 +81,26 @@ ATF_TC_HEAD(sysarch_success, tc)
 
 ATF_TC_BODY(sysarch_success, tc)
 {
-	int sysnum = 0;
 	pid = getpid();
 	snprintf(miscreg, sizeof(miscreg), "sysarch.*%d.*return,success", pid);
 
 	/* Set sysnum to the syscall corresponding to the system architecture */
-#if defined(I386_GET_LDT)		/* i386 */
-	sysnum = I386_GET_LDT;
-#elif defined(AMD64_GET_FSBASE)		/* amd64 */
-	sysnum = AMD64_GET_FSBASE;
-#elif defined(MIPS_GET_TLS)		/* MIPS */
-	sysnum = MIPS_GET_TLS;
-#elif defined(ARM_GET_VFPSTATE)		/* ARM */
-	sysnum = ARM_GET_VFPSTATE;
-#elif defined(SPARC_UTRAP_INSTALL)	/* Sparc64 */
-	sysnum = SPARC_UTRAP_INSTALL;
+#if defined(I386_GET_IOPERM)		/* i386 */
+	struct i386_ioperm_args i3sysarg;
+	bzero(&i3sysarg, sizeof(i3sysarg));
 
-	struct sparc_utrap_args handler {
+#elif defined(AMD64_GET_FSBASE)		/* amd64 */
+	register_t amd64arg;
+
+#elif defined(MIPS_GET_TLS)		/* MIPS */
+	char *mipsarg;
+
+#elif defined(ARM_SYNC_ICACHE)		/* ARM */
+	struct arm_sync_icache_args armsysarg;
+	bzero(&armsysarg, sizeof(armsysarg));
+
+#elif defined(SPARC_UTRAP_INSTALL)	/* Sparc64 */
+	struct sparc_utrap_args handler = {
 		.type		= UT_DIVISION_BY_ZERO,
 		/* We don't want to change the previous handlers */
 		.new_precise	= UTH_NOCHANGE,
@@ -106,7 +109,7 @@ ATF_TC_BODY(sysarch_success, tc)
 		.old_deferred	= NULL
 	};
 
-	struct sparc_utrap_install_args sparc64arg {
+	struct sparc_utrap_install_args sparc64arg = {
 		.num 		= ST_DIVISION_BY_ZERO,
 		.handlers	= &handler
 	};
@@ -116,12 +119,16 @@ ATF_TC_BODY(sysarch_success, tc)
 #endif
 
 	FILE *pipefd = setup(fds, auclass);
-#if defined(SPARC_UTRAP_INSTALL)
-	ATF_REQUIRE_EQ(0, sysarch(sysnum, &sparc64arg));
-#else
-	/* Since we're just retrieving information, a (void *) arg would do */
-	void *sysarg;
-	ATF_REQUIRE_EQ(0, sysarch(sysnum, &sysarg));
+#if defined(I386_GET_IOPERM)
+	ATF_REQUIRE_EQ(0, sysarch(I386_GET_IOPERM, &i3sysarg));
+#elif defined(AMD64_GET_FSBASE)
+	ATF_REQUIRE_EQ(0, sysarch(AMD64_GET_FSBASE, &amd64arg));
+#elif defined(MIPS_GET_TLS)
+	ATF_REQUIRE_EQ(0, sysarch(MIPS_GET_TLS, &mipsarg));
+#elif defined(ARM_SYNC_ICACHE)
+	ATF_REQUIRE_EQ(0, sysarch(ARM_SYNC_ICACHE, &armsysarg));
+#elif defined(SPARC_UTRAP_INSTALL)
+	ATF_REQUIRE_EQ(0, sysarch(SPARC_UTRAP_INSTALL, &sparc64arg));
 #endif
 	check_audit(fds, miscreg, pipefd);
 }

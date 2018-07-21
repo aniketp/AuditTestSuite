@@ -749,12 +749,12 @@ ATF_TC_HEAD(auditon_getpolicy_success, tc)
 
 ATF_TC_BODY(auditon_getpolicy_success, tc)
 {
-	int *aupolicy = (int *)malloc(sizeof(int));
+	int aupolicy;
 	pid = getpid();
 	snprintf(adregex, sizeof(adregex), "GPOLICY command.*%d.*success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_GETPOLICY, aupolicy, sizeof(aupolicy)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETPOLICY, &aupolicy, sizeof(aupolicy)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -797,14 +797,14 @@ ATF_TC_HEAD(auditon_setpolicy_success, tc)
 
 ATF_TC_BODY(auditon_setpolicy_success, tc)
 {
-	int *aupolicy = (int *)malloc(sizeof(int));
+	int aupolicy;
 	pid = getpid();
 	snprintf(adregex, sizeof(adregex), "SPOLICY command.*%d.*success", pid);
 
 	/* Retrieve the current auditing policy, to be used with A_SETPOLICY */
-	ATF_REQUIRE_EQ(0, auditon(A_GETPOLICY, aupolicy, sizeof(aupolicy)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETPOLICY, &aupolicy, sizeof(aupolicy)));
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_SETPOLICY, aupolicy, sizeof(aupolicy)));
+	ATF_REQUIRE_EQ(0, auditon(A_SETPOLICY, &aupolicy, sizeof(aupolicy)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -1153,12 +1153,12 @@ ATF_TC_HEAD(auditon_getcond_success, tc)
 
 ATF_TC_BODY(auditon_getcond_success, tc)
 {
-	int *auditcond = (int *)malloc(sizeof(int));
+	int auditcond;
 	pid = getpid();
 	snprintf(adregex, sizeof(adregex), "get audit state.*%d.*success", pid);
 
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, auditcond, sizeof(auditcond)));
+	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, &auditcond, sizeof(auditcond)));
 	check_audit(fds, adregex, pipefd);
 }
 
@@ -1201,14 +1201,13 @@ ATF_TC_HEAD(auditon_setcond_success, tc)
 
 ATF_TC_BODY(auditon_setcond_success, tc)
 {
-	int *auditcond = (int *)malloc(sizeof(int));
+	int auditcond = AUC_AUDITING;
 	pid = getpid();
 	snprintf(adregex, sizeof(adregex), "set audit state.*%d.*success", pid);
 
-	/* Retrieve the current state of auditing, to be used with A_SETCOND */
-	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, auditcond, sizeof(auditcond)));
 	FILE *pipefd = setup(fds, auclass);
-	ATF_REQUIRE_EQ(0, auditon(A_SETCOND, auditcond, sizeof(auditcond)));
+	/* At this point auditd is running, so the audit state is AUC_AUDITING */
+	ATF_REQUIRE_EQ(0, auditon(A_SETCOND, &auditcond, sizeof(auditcond)));
 	check_audit(fds, adregex, pipefd);
 }
 

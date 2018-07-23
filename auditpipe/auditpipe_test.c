@@ -172,6 +172,64 @@ ATF_TC_BODY(auditpipe_get_maxauditdata, tc)
 }
 
 
+ATF_TC(auditpipe_flush);
+ATF_TC_HEAD(auditpipe_flush, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+					"AUDITPIPE_FLUSH works properly");
+}
+
+ATF_TC_BODY(auditpipe_flush, tc)
+{
+	int qlen;
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_FLUSH));
+
+	/* AUDITPIPE_FLUSH clears any outstanding record in auditpipe */
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_GET_QLEN, &qlen));
+	ATF_REQUIRE_EQ(0, qlen);
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_get_preselect_mode);
+ATF_TC_HEAD(auditpipe_get_preselect_mode, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+				"AUDITPIPE_GET_PRESELECT_MODE works properly");
+}
+
+ATF_TC_BODY(auditpipe_get_preselect_mode, tc)
+{
+	int mode = -1;
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_GET_PRESELECT_MODE, &mode));
+	ATF_REQUIRE(mode != -1);
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_set_preselect_mode);
+ATF_TC_HEAD(auditpipe_set_preselect_mode, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+				"AUDITPIPE_SET_PRESELECT_MODE works properly");
+}
+
+ATF_TC_BODY(auditpipe_set_preselect_mode, tc)
+{
+	int recv_mode;
+	int mode = AUDITPIPE_PRESELECT_MODE_TRAIL;
+
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &mode));
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_GET_PRESELECT_MODE, &recv_mode));
+	ATF_REQUIRE_EQ(mode, recv_mode);
+	close(filedesc);
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, auditpipe_get_qlen);
@@ -180,6 +238,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, auditpipe_get_qlimit_min);
 	ATF_TP_ADD_TC(tp, auditpipe_get_qlimit_max);
 	ATF_TP_ADD_TC(tp, auditpipe_get_maxauditdata);
+	ATF_TP_ADD_TC(tp, auditpipe_flush);
+	ATF_TP_ADD_TC(tp, auditpipe_get_preselect_mode);
+	ATF_TP_ADD_TC(tp, auditpipe_set_preselect_mode);
 
 	return (atf_no_error());
 }

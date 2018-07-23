@@ -32,6 +32,7 @@
 
 #include <atf-c.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -219,13 +220,119 @@ ATF_TC_HEAD(auditpipe_set_preselect_mode, tc)
 ATF_TC_BODY(auditpipe_set_preselect_mode, tc)
 {
 	int recv_mode;
-	int mode = AUDITPIPE_PRESELECT_MODE_TRAIL;
+	int mode = AUDITPIPE_PRESELECT_MODE_LOCAL;
 
 	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
 	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &mode));
 	ATF_REQUIRE_EQ(0, ioctl(filedesc,
 		AUDITPIPE_GET_PRESELECT_MODE, &recv_mode));
 	ATF_REQUIRE_EQ(mode, recv_mode);
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_get_preselect_flags);
+ATF_TC_HEAD(auditpipe_get_preselect_flags, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+				"AUDITPIPE_GET_PRESELECT_FLAGS works properly");
+}
+
+ATF_TC_BODY(auditpipe_get_preselect_flags, tc)
+{
+	au_mask_t fmask = {
+		.am_success	=	UINT_MAX,
+		.am_failure	=	UINT_MAX
+	};
+
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_GET_PRESELECT_FLAGS, &fmask));
+
+	/* Check if both success and failure bits are set by this ioctl */
+	ATF_REQUIRE(fmask.am_success != UINT_MAX);
+	ATF_REQUIRE(fmask.am_failure != UINT_MAX);
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_set_preselect_flags);
+ATF_TC_HEAD(auditpipe_set_preselect_flags, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+				"AUDITPIPE_SET_PRESELECT_FLAGS works properly");
+}
+
+ATF_TC_BODY(auditpipe_set_preselect_flags, tc)
+{
+	int mode = AUDITPIPE_PRESELECT_MODE_LOCAL;
+	au_mask_t fmask, gmask;
+	bzero(&fmask, sizeof(fmask));
+
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	/* Set local mode auditing to not alter the system wide audit mask */
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &mode));
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_SET_PRESELECT_FLAGS, &fmask));
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_GET_PRESELECT_FLAGS, &gmask));
+
+	/* Check if both success and failure bits are set by this ioctl */
+	ATF_REQUIRE_EQ(fmask.am_success, gmask.am_success);
+	ATF_REQUIRE_EQ(fmask.am_failure, gmask.am_failure);
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_get_preselect_naflags);
+ATF_TC_HEAD(auditpipe_get_preselect_naflags, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+			"AUDITPIPE_GET_PRESELECT_NAFLAGS works properly");
+}
+
+ATF_TC_BODY(auditpipe_get_preselect_naflags, tc)
+{
+	au_mask_t fmask = {
+		.am_success	=	UINT_MAX,
+		.am_failure	=	UINT_MAX
+	};
+
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_GET_PRESELECT_NAFLAGS, &fmask));
+
+	/* Check if both success and failure bits are set by this ioctl */
+	ATF_REQUIRE(fmask.am_success != UINT_MAX);
+	ATF_REQUIRE(fmask.am_failure != UINT_MAX);
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_set_preselect_naflags);
+ATF_TC_HEAD(auditpipe_set_preselect_naflags, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditpipe ioctl, "
+			"AUDITPIPE_SET_PRESELECT_NAFLAGS works properly");
+}
+
+ATF_TC_BODY(auditpipe_set_preselect_naflags, tc)
+{
+	int mode = AUDITPIPE_PRESELECT_MODE_LOCAL;
+	au_mask_t fmask, gmask;
+	bzero(&fmask, sizeof(fmask));
+
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	/* Set local mode auditing to not alter the system wide audit mask */
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_SET_PRESELECT_MODE, &mode));
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_SET_PRESELECT_NAFLAGS, &fmask));
+	ATF_REQUIRE_EQ(0, ioctl(filedesc,
+		AUDITPIPE_GET_PRESELECT_NAFLAGS, &gmask));
+
+	/* Check if both success and failure bits are set correctly */
+	ATF_REQUIRE_EQ(fmask.am_success, gmask.am_success);
+	ATF_REQUIRE_EQ(fmask.am_failure, gmask.am_failure);
 	close(filedesc);
 }
 
@@ -241,6 +348,10 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, auditpipe_flush);
 	ATF_TP_ADD_TC(tp, auditpipe_get_preselect_mode);
 	ATF_TP_ADD_TC(tp, auditpipe_set_preselect_mode);
+	ATF_TP_ADD_TC(tp, auditpipe_get_preselect_flags);
+	ATF_TP_ADD_TC(tp, auditpipe_set_preselect_flags);
+	ATF_TP_ADD_TC(tp, auditpipe_get_preselect_naflags);
+	ATF_TP_ADD_TC(tp, auditpipe_set_preselect_naflags);
 
 	return (atf_no_error());
 }

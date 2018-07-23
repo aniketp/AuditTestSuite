@@ -156,6 +156,44 @@ ATF_TC_BODY(auditpipe_get_qlimit_max, tc)
 }
 
 
+ATF_TC(auditpipe_qlimit_more_than_qlimit_min);
+ATF_TC_HEAD(auditpipe_qlimit_more_than_qlimit_min, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies that limit for audit records "
+				"in auditpipe cannot be less than QLIMIT_MIN ");
+}
+
+ATF_TC_BODY(auditpipe_qlimit_more_than_qlimit_min, tc)
+{
+	int qlim_min;
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_GET_QLIMIT_MIN, &qlim_min));
+
+	qlim_min -= 1;
+	ATF_REQUIRE_EQ(-1, ioctl(filedesc, AUDITPIPE_SET_QLIMIT, &qlim_min));
+	close(filedesc);
+}
+
+
+ATF_TC(auditpipe_qlimit_less_than_qlimit_max);
+ATF_TC_HEAD(auditpipe_qlimit_less_than_qlimit_max, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies that limit for audit records "
+				"in auditpipe cannot be more than QLIMIT_MAX ");
+}
+
+ATF_TC_BODY(auditpipe_qlimit_less_than_qlimit_max, tc)
+{
+	int qlim_max;
+	ATF_REQUIRE((filedesc = open("/dev/auditpipe", O_RDONLY)) != -1);
+	ATF_REQUIRE_EQ(0, ioctl(filedesc, AUDITPIPE_GET_QLIMIT_MAX, &qlim_max));
+
+	qlim_max += 1;
+	ATF_REQUIRE_EQ(-1, ioctl(filedesc, AUDITPIPE_SET_QLIMIT, &qlim_max));
+	close(filedesc);
+}
+
+
 ATF_TC(auditpipe_get_maxauditdata);
 ATF_TC_HEAD(auditpipe_get_maxauditdata, tc)
 {
@@ -344,6 +382,8 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, auditpipe_set_qlimit);
 	ATF_TP_ADD_TC(tp, auditpipe_get_qlimit_min);
 	ATF_TP_ADD_TC(tp, auditpipe_get_qlimit_max);
+	ATF_TP_ADD_TC(tp, auditpipe_qlimit_more_than_qlimit_min);
+	ATF_TP_ADD_TC(tp, auditpipe_qlimit_less_than_qlimit_max);
 	ATF_TP_ADD_TC(tp, auditpipe_get_maxauditdata);
 	ATF_TP_ADD_TC(tp, auditpipe_flush);
 	ATF_TP_ADD_TC(tp, auditpipe_get_preselect_mode);

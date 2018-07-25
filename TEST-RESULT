@@ -1,3 +1,7 @@
+========================================================================================
+				  AUDIT SUBSYSTEM TESTS
+========================================================================================
+
 administrative:acct_failure  ->  passed  [0.047s]
 administrative:acct_success  ->  passed  [0.034s]
 administrative:adjtime_failure  ->  passed  [0.055s]
@@ -416,3 +420,24 @@ Results file id is usr_tests_sys_audit.20180725-155530-403333
 Results saved to /root/.kyua/store/results.usr_tests_sys_audit.20180725-155530-403333.db
 
 413/413 passed (0 failed)
+
+========================================================================================
+				     PRAUDIT TESTS
+========================================================================================
+
+praudit_test:praudit_delim_comma  ->  passed  [0.022s]
+praudit_test:praudit_delim_underscore  ->  passed  [0.022s]
+praudit_test:praudit_no_args  ->  passed  [0.021s]
+praudit_test:praudit_numeric_form  ->  passed  [0.022s]
+praudit_test:praudit_raw_form  ->  passed  [0.026s]
+praudit_test:praudit_raw_short_exclusive  ->  passed  [0.019s]
+praudit_test:praudit_same_line  ->  passed  [0.022s]
+praudit_test:praudit_short_form  ->  passed  [0.021s]
+praudit_test:praudit_sync_to_next_record  ->  passed  [0.022s]
+praudit_test:praudit_xml_form  ->  passed  [0.024s]
+
+Results file id is usr_tests_usr.sbin_praudit.20180725-160349-035044
+Results saved to /root/.kyua/store/results.usr_tests_usr.sbin_praudit.20180725-160349-035044.db
+
+10/10 passed (0 failed)
+

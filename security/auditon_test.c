@@ -29,13 +29,15 @@
 #include <bsm/libbsm.h>
 
 #include <atf-c.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <unistd.h>
 
 static FILE *fileptr;
-
+/* Default argument for handling ENOSYS in auditon(2) functions */
+static int auditon_def = 0;
 
 ATF_TC(auditon_getkaudit);
 ATF_TC_HEAD(auditon_getkaudit, tc)
@@ -193,12 +195,177 @@ ATF_TC_CLEANUP(auditon_setpolicy, tc)
 }
 
 
+ATF_TC(auditon_getkmask);
+ATF_TC_HEAD(auditon_getkmask, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_GETKMASK works properly");
+}
+
+ATF_TC_BODY(auditon_getkmask, tc)
+{
+	au_mask_t fmask = {
+		.am_success	=	UINT_MAX,
+		.am_failure	=	UINT_MAX
+	};
+
+	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &fmask, sizeof(au_mask_t)));
+	ATF_REQUIRE(fmask.am_success != UINT_MAX);
+	ATF_REQUIRE(fmask.am_failure != UINT_MAX);
+}
+
+
+ATF_TC_WITH_CLEANUP(auditon_setkmask);
+ATF_TC_HEAD(auditon_setkmask, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_SETKMASK works properly");
+}
+
+ATF_TC_BODY(auditon_setkmask, tc)
+{
+	au_mask_t fmask, gmask;
+	au_class_ent_t *auclass;
+	bzero(&fmask, sizeof(au_mask_t));
+	bzero(&gmask, sizeof(au_mask_t));
+
+	/* Retrieve the current kernel pre-selection mask store it in a file */
+	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &fmask, sizeof(au_mask_t)));
+	ATF_REQUIRE((fileptr = fopen("setkmask_store", "a")) != NULL);
+	ATF_REQUIRE(fprintf(fileptr, "%d\n%d\n",
+		fmask.am_success, fmask.am_failure) != -1);
+
+	/*
+	 * Set kernel pre-selection mask different from the current system value
+	 * to confirm proper functioning of A_SETKMASK cmd argument.
+	 */
+	ATF_CHECK((auclass = getauclassnam("fc")) != NULL);
+	fmask.am_success = auclass->ac_class;
+	fmask.am_failure = auclass->ac_class;
+
+	ATF_REQUIRE_EQ(0, auditon(A_SETKMASK, &fmask, sizeof(au_mask_t)));
+	/* Receive modified value and check whether mask was set correctly */
+	ATF_REQUIRE_EQ(0, auditon(A_GETKMASK, &gmask, sizeof(au_mask_t)));
+	ATF_REQUIRE_EQ(fmask.am_success, gmask.am_success);
+	ATF_REQUIRE_EQ(fmask.am_failure, gmask.am_failure);
+	fclose(fileptr);
+}
+
+ATF_TC_CLEANUP(auditon_setkmask, tc)
+{
+	if (atf_utils_file_exists("setkmask_store")) {
+		au_mask_t fmask;
+		ATF_REQUIRE((fileptr = fopen("setkmask_store", "r")) != NULL);
+		ATF_REQUIRE(fscanf(fileptr, "%d\n%d",
+			&fmask.am_success, &fmask.am_failure) != -1);
+
+		/* Set pre-selection mask as it was prior to test invocation */
+		ATF_REQUIRE_EQ(0, auditon(A_SETKMASK, &fmask,
+			sizeof(au_mask_t)));
+		fclose(fileptr);
+	}
+}
+
+
+ATF_TC(auditon_getstat);
+ATF_TC_HEAD(auditon_getstat, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_GETSTAT returns ENOSYS");
+}
+
+ATF_TC_BODY(auditon_getstat, tc)
+{
+	ATF_REQUIRE_ERRNO(ENOSYS, auditon(A_GETSTAT, &auditon_def,
+		sizeof(int)) == -1);
+}
+
+
+ATF_TC(auditon_setstat);
+ATF_TC_HEAD(auditon_setstat, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_SETSTAT returns ENOSYS");
+}
+
+ATF_TC_BODY(auditon_setstat, tc)
+{
+	ATF_REQUIRE_ERRNO(ENOSYS, auditon(A_SETSTAT, &auditon_def,
+		sizeof(int)) == -1);
+}
+
+
+ATF_TC(auditon_getcar);
+ATF_TC_HEAD(auditon_getcar, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_GETCAR returns ENOSYS");
+}
+
+ATF_TC_BODY(auditon_getcar, tc)
+{
+	ATF_REQUIRE_ERRNO(ENOSYS, auditon(A_GETCAR, &auditon_def,
+		sizeof(int)) == -1);
+}
+
+
+ATF_TC(auditon_getcwd);
+ATF_TC_HEAD(auditon_getcwd, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_GETCWD returns ENOSYS");
+}
+
+ATF_TC_BODY(auditon_getcwd, tc)
+{
+	ATF_REQUIRE_ERRNO(ENOSYS, auditon(A_GETCWD, &auditon_def,
+		sizeof(int)) == -1);
+}
+
+
+ATF_TC(auditon_setumask);
+ATF_TC_HEAD(auditon_setumask, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_SETUMASK returns ENOSYS");
+}
+
+ATF_TC_BODY(auditon_setumask, tc)
+{
+	ATF_REQUIRE_ERRNO(ENOSYS, auditon(A_SETUMASK, &auditon_def,
+		sizeof(int)) == -1);
+}
+
+
+ATF_TC(auditon_setsmask);
+ATF_TC_HEAD(auditon_setsmask, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_SETSMASK returns ENOSYS");
+}
+
+ATF_TC_BODY(auditon_setsmask, tc)
+{
+	ATF_REQUIRE_ERRNO(ENOSYS, auditon(A_SETSMASK, &auditon_def,
+		sizeof(int)) == -1);
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, auditon_getkaudit);
 	ATF_TP_ADD_TC(tp, auditon_setkaudit);
 	ATF_TP_ADD_TC(tp, auditon_getpolicy);
 	ATF_TP_ADD_TC(tp, auditon_setpolicy);
+	ATF_TP_ADD_TC(tp, auditon_getkmask);
+	ATF_TP_ADD_TC(tp, auditon_setkmask);
+
+	ATF_TP_ADD_TC(tp, auditon_getstat);
+	ATF_TP_ADD_TC(tp, auditon_setstat);
+	ATF_TP_ADD_TC(tp, auditon_getcar);
+	ATF_TP_ADD_TC(tp, auditon_getcwd);
+	ATF_TP_ADD_TC(tp, auditon_setumask);
+	ATF_TP_ADD_TC(tp, auditon_setsmask);
 
 	return (atf_no_error());
 }

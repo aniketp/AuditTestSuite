@@ -18,7 +18,7 @@ An implementation of regression testsuite for FreeBSD's audit subsystem. Made as
 	<tr align="center">
 		<td>1</td>
 		<td>audit(4) subsystem</td>
-		<td>8652</td>
+		<td>8785</td>
 		<td><a href="https://github.com/freebsd/freebsd/tree/master/tests/sys/audit">Merged</a></td>
 	</tr>
 	<tr>
@@ -32,18 +32,19 @@ An implementation of regression testsuite for FreeBSD's audit subsystem. Made as
 	</tr>
 	<tr align="center">
 		<td>2</td>
-		<td>praudit(4) viewer utility</td>
+		<td>praudit(1) viewer utility</td>
 		<td>136</td>
 		<td><a href="https://github.com/freebsd/freebsd/tree/master/usr.sbin/praudit/tests">Merged</a></td>
 	</tr>
 	<tr align="center">
 		<td>3</td>
 		<td>auditon(2) system call</td>
-		<td>94</td>
+		<td>270</td>
 		<td><a href="https://github.com/aniketp/AuditTestSuite/tree/master/security">In Progress</a></td>
 	</tr>
 </table>
 <p></p>
+*SLOC: Source Lines of Code
 
 ## Project Overview
 FreeBSD is a rapidly developing operating system with an extreme focus on advanced security & networking features. For an OS with a widespread usage and development, testing and monitoring of security regressions becomes a critical measure. FreeBSD has an audit subsystem which is responsible for monitoring a variety of security-relevant system events, such as user-logins, configuration changes, file system & network access. Although the audit framework is indispensable for security conscious organizations running FreeBSD servers, currently there is no tool to test its reliability and the intended behaviour.

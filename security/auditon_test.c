@@ -26,6 +26,7 @@
  */
 
 #include <bsm/audit.h>
+#include <bsm/libbsm.h>
 
 #include <atf-c.h>
 #include <fcntl.h>
@@ -69,12 +70,69 @@ ATF_TC_BODY(auditon_getkaudit, tc)
 
 	ATF_REQUIRE(curr_kaudit.ai_auid != UINT_MAX);
 	ATF_REQUIRE(curr_kaudit.ai_mask.am_success != UINT_MAX);
-	ATF_REQUIRE(curr_kaudit.ai_mask.am_success != UINT_MAX);
+	ATF_REQUIRE(curr_kaudit.ai_mask.am_failure != UINT_MAX);
 	ATF_REQUIRE(curr_kaudit.ai_asid != INT_MAX);
 	ATF_REQUIRE(curr_kaudit.ai_termid.at_port != UINT_MAX);
 	ATF_REQUIRE(curr_kaudit.ai_termid.at_type != UINT_MAX);
 	ATF_REQUIRE(curr_kaudit.ai_termid.at_addr[0] != UINT_MAX);
 	ATF_REQUIRE(curr_kaudit.ai_flags != UINT_MAX);
+}
+
+
+ATF_TC_WITH_CLEANUP(auditon_setkaudit);
+ATF_TC_HEAD(auditon_setkaudit, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_SETKAUDIT works properly");
+}
+
+ATF_TC_BODY(auditon_setkaudit, tc)
+{
+	au_class_ent_t *auclass;
+	auditinfo_addr_t curr_kaudit, recv_kaudit;
+	bzero(&curr_kaudit, sizeof(auditinfo_addr_t));
+	bzero(&recv_kaudit, sizeof(auditinfo_addr_t));
+
+	/* Retrieve the current Host status and store current the audit_mask */
+	ATF_REQUIRE_EQ(0, auditon(A_GETKAUDIT, &curr_kaudit,
+		sizeof(auditinfo_addr_t)));
+	ATF_REQUIRE((fileptr = fopen("setkaudit_store", "a")) != NULL);
+	ATF_REQUIRE(fprintf(fileptr, "%d\n",
+		curr_kaudit.ai_mask.am_success) != -1);
+
+	/* Set "lo,aa" as the audit class mask, as they are system default */
+	ATF_CHECK((auclass = getauclassnam("lo")) != NULL);
+	curr_kaudit.ai_mask.am_success = auclass->ac_class;
+	ATF_CHECK((auclass = getauclassnam("aa")) != NULL);
+	curr_kaudit.ai_mask.am_success |= auclass->ac_class;
+
+	ATF_REQUIRE_EQ(0, auditon(A_SETKAUDIT, &curr_kaudit,
+		sizeof(auditinfo_addr_t)));
+	/* Receive modified value and check if Host state was set correctly */
+	ATF_REQUIRE_EQ(0, auditon(A_GETKAUDIT, &recv_kaudit,
+		sizeof(auditinfo_addr_t)));
+	ATF_REQUIRE_EQ(curr_kaudit.ai_mask.am_success,
+		recv_kaudit.ai_mask.am_success);
+	fclose(fileptr);
+}
+
+ATF_TC_CLEANUP(auditon_setkaudit, tc)
+{
+	if (atf_utils_file_exists("setkaudit_store")) {
+		int success_bit;
+		auditinfo_addr_t curr_kaudit;
+		ATF_REQUIRE_EQ(0, auditon(A_GETKAUDIT, &curr_kaudit,
+			sizeof(auditinfo_addr_t)));
+
+		ATF_REQUIRE((fileptr = fopen("setkaudit_store", "r")) != NULL);
+		ATF_REQUIRE(fscanf(fileptr, "%d", &success_bit) != -1);
+
+		curr_kaudit.ai_mask.am_success = success_bit;
+		/* Set Host state as it was prior to test-case invocation */
+		ATF_REQUIRE_EQ(0, auditon(A_SETKAUDIT, &curr_kaudit,
+			sizeof(auditinfo_addr_t)));
+		fclose(fileptr);
+	}
 }
 
 
@@ -138,6 +196,7 @@ ATF_TC_CLEANUP(auditon_setpolicy, tc)
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, auditon_getkaudit);
+	ATF_TP_ADD_TC(tp, auditon_setkaudit);
 	ATF_TP_ADD_TC(tp, auditon_getpolicy);
 	ATF_TP_ADD_TC(tp, auditon_setpolicy);
 

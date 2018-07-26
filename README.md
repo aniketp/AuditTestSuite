@@ -8,7 +8,7 @@ An implementation of regression testsuite for FreeBSD's audit subsystem. Made as
 <table align="center">
 	<tr>
 		<th>S. No</th>
-		<th>Feature</th>
+		<th>Test Suite</th>
 		<th>SLOC</th>
 		<th>Status</th>
 	</tr>

@@ -422,7 +422,7 @@ Results saved to /root/.kyua/store/results.usr_tests_sys_audit.20180725-155530-4
 413/413 passed (0 failed)
 
 ========================================================================================
-				     PRAUDIT TESTS
+			  PRAUDIT AUDIT VIEWER UTILITY TESTS
 ========================================================================================
 
 praudit_test:praudit_delim_comma  ->  passed  [0.022s]
@@ -441,3 +441,27 @@ Results saved to /root/.kyua/store/results.usr_tests_usr.sbin_praudit.20180725-1
 
 10/10 passed (0 failed)
 
+========================================================================================
+			   AUDITPIPE PSEUDO DEVICE TESTS
+========================================================================================
+
+auditpipe_test:auditpipe_flush  ->  passed  [0.004s]
+auditpipe_test:auditpipe_get_maxauditdata  ->  passed  [0.003s]
+auditpipe_test:auditpipe_get_preselect_flags  ->  passed  [0.004s]
+auditpipe_test:auditpipe_get_preselect_mode  ->  passed  [0.003s]
+auditpipe_test:auditpipe_get_preselect_naflags  ->  passed  [0.003s]
+auditpipe_test:auditpipe_get_qlen  ->  passed  [0.005s]
+auditpipe_test:auditpipe_get_qlimit  ->  passed  [0.003s]
+auditpipe_test:auditpipe_get_qlimit_max  ->  passed  [0.003s]
+auditpipe_test:auditpipe_get_qlimit_min  ->  passed  [0.004s]
+auditpipe_test:auditpipe_qlimit_less_than_qlimit_max  ->  passed  [0.003s]
+auditpipe_test:auditpipe_qlimit_more_than_qlimit_min  ->  passed  [0.004s]
+auditpipe_test:auditpipe_set_preselect_flags  ->  passed  [0.003s]
+auditpipe_test:auditpipe_set_preselect_mode  ->  passed  [0.003s]
+auditpipe_test:auditpipe_set_preselect_naflags  ->  passed  [0.005s]
+auditpipe_test:auditpipe_set_qlimit  ->  passed  [0.004s]
+
+Results file id is usr_tests_sys_auditpipe.20180726-223432-286452
+Results saved to /root/.kyua/store/results.usr_tests_sys_auditpipe.20180726-223432-286452.db
+
+15/15 passed (0 failed)

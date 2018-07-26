@@ -2,6 +2,49 @@
 An implementation of regression testsuite for FreeBSD's audit subsystem. Made as a part of [GSoC'18 with FreeBSD](https://summerofcode.withgoogle.com/projects/#4507139591110656). <br/>
 **For a complete overview and further updates on the project, checkout the [Project Wiki](https://wiki.freebsd.org/SummerOfCode2018Projects/RegressionTestSuiteForAuditFramework)**.
 
+## Project Status
+
+<p align="center"></p>
+<table align="center">
+	<tr>
+		<th>S. No</th>
+		<th>Feature</th>
+		<th>SLOC</th>
+		<th>Status</th>
+	</tr>
+	<tr>
+		<td colspan="4" align="center"><strong>Proposed Work</strong></td>
+	</tr>
+	<tr align="center">
+		<td>1</td>
+		<td>audit(4) subsystem</td>
+		<td>8652</td>
+		<td><a href="https://github.com/freebsd/freebsd/tree/master/tests/sys/audit">Merged</a></td>
+	</tr>
+	<tr>
+		<td colspan="4" align="center"><strong>Stretch Goal</strong></td>
+	</tr>
+	<tr align="center">
+		<td>1</td>
+		<td>auditipipe(4) subsystem</td>
+		<td>293</td>
+		<td><a href="https://github.com/freebsd/freebsd/tree/master/tests/sys/auditpipe">Merged</a></td>
+	</tr>
+	<tr align="center">
+		<td>2</td>
+		<td>praudit(4) viewer utility</td>
+		<td>136</td>
+		<td><a href="https://github.com/freebsd/freebsd/tree/master/usr.sbin/praudit/tests">Merged</a></td>
+	</tr>
+	<tr align="center">
+		<td>3</td>
+		<td>auditon(2) system call</td>
+		<td>94</td>
+		<td><a href="https://github.com/aniketp/AuditTestSuite/tree/master/security">In Progress</a></td>
+	</tr>
+</table>
+<p></p>
+
 ## Project Overview
 FreeBSD is a rapidly developing operating system with an extreme focus on advanced security & networking features. For an OS with a widespread usage and development, testing and monitoring of security regressions becomes a critical measure. FreeBSD has an audit subsystem which is responsible for monitoring a variety of security-relevant system events, such as user-logins, configuration changes, file system & network access. Although the audit framework is indispensable for security conscious organizations running FreeBSD servers, currently there is no tool to test its reliability and the intended behaviour.
 
@@ -18,6 +61,12 @@ These tests can be run independently since Kyua enables standalone testing, or t
 ``` bash
  cd /usr/tests/sys/audit
  kyua test [audit_class]:[audit_event]
+```
+
+* To explicitely test `auditpipe(4)` subsystem:
+``` bash
+ cd /usr/tests/sys/auditpipe
+ kyua test [auditpipe_test]
 ```
 
 * To test the audit viewer utility `praudit(1)`:

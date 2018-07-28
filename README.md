@@ -44,7 +44,6 @@ An implementation of regression testsuite for FreeBSD's audit subsystem. Made as
 	</tr>
 </table>
 <p></p>
-*SLOC: Source Lines of Code
 
 ## Project Overview
 FreeBSD is a rapidly developing operating system with an extreme focus on advanced security & networking features. For an OS with a widespread usage and development, testing and monitoring of security regressions becomes a critical measure. FreeBSD has an audit subsystem which is responsible for monitoring a variety of security-relevant system events, such as user-logins, configuration changes, file system & network access. Although the audit framework is indispensable for security conscious organizations running FreeBSD servers, currently there is no tool to test its reliability and the intended behaviour.

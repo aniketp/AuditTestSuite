@@ -351,6 +351,63 @@ ATF_TC_BODY(auditon_setsmask, tc)
 }
 
 
+ATF_TC(auditon_getcond);
+ATF_TC_HEAD(auditon_getcond, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_GETCOND works properly");
+}
+
+ATF_TC_BODY(auditon_getcond, tc)
+{
+	int curr_cond = -1;
+	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, &curr_cond, sizeof(int)));
+	ATF_REQUIRE(curr_cond != -1);
+}
+
+
+ATF_TC_WITH_CLEANUP(auditon_setcond);
+ATF_TC_HEAD(auditon_setcond, tc)
+{
+	atf_tc_set_md_var(tc, "descr", "Verifies whether the auditon's cmd, "
+					"argument A_SETCOND works properly");
+}
+
+ATF_TC_BODY(auditon_setcond, tc)
+{
+	int curr_cond, test_cond, recv_cond;
+
+	/* Retrieve the current auditing condition and store it in a file */
+	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, &curr_cond, sizeof(int)));
+	ATF_REQUIRE((fileptr = fopen("setcond_store", "a")) != NULL);
+	ATF_REQUIRE(fprintf(fileptr, "%d\n", curr_cond) != -1);
+
+	/*
+	 * Set audit condition different from the current system value to
+	 * confirm proper functioning of A_SETCOND cmd argument.
+	 */
+	test_cond = (AUC_AUDITING | AUC_NOAUDIT) & ~(curr_cond);
+	ATF_REQUIRE_EQ(0, auditon(A_SETCOND, &test_cond, sizeof(int)));
+	/* Receive modified value and check if the auditing was set correctly */
+	ATF_REQUIRE_EQ(0, auditon(A_GETCOND, &recv_cond, sizeof(int)));
+	ATF_REQUIRE_EQ(test_cond, recv_cond);
+	fclose(fileptr);
+}
+
+ATF_TC_CLEANUP(auditon_setcond, tc)
+{
+	if (atf_utils_file_exists("setcond_store")) {
+		int curr_cond;
+		ATF_REQUIRE((fileptr = fopen("setcond_store", "r")) != NULL);
+		ATF_REQUIRE(fscanf(fileptr, "%d", &curr_cond) != -1);
+
+		/* Set auditing conditon as it was prior to test invocation */
+		ATF_REQUIRE_EQ(0, auditon(A_SETCOND, &curr_cond, sizeof(int)));
+		fclose(fileptr);
+	}
+}
+
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, auditon_getkaudit);
@@ -366,6 +423,9 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, auditon_getcwd);
 	ATF_TP_ADD_TC(tp, auditon_setumask);
 	ATF_TP_ADD_TC(tp, auditon_setsmask);
+
+	ATF_TP_ADD_TC(tp, auditon_getcond);
+	ATF_TP_ADD_TC(tp, auditon_setcond);
 
 	return (atf_no_error());
 }

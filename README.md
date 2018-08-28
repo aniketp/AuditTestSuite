@@ -1,5 +1,5 @@
 # Regression Test-Suite for Audit Framework
-An implementation of regression testsuite for FreeBSD's audit subsystem. Made as a part of [GSoC'18 with FreeBSD](https://summerofcode.withgoogle.com/projects/#4507139591110656). <br/>
+An implementation of regression testsuite for FreeBSD's audit subsystem. Made as part of [GSoC'18 with FreeBSD](https://summerofcode.withgoogle.com/projects/#4696891313356800). <br/>
 **For a complete overview and further updates on the project, checkout the [Project Wiki](https://wiki.freebsd.org/SummerOfCode2018Projects/RegressionTestSuiteForAuditFramework)**.
 
 ## Project Status
@@ -26,7 +26,7 @@ An implementation of regression testsuite for FreeBSD's audit subsystem. Made as
 	</tr>
 	<tr align="center">
 		<td>1</td>
-		<td>auditipipe(4) subsystem</td>
+		<td>auditpipe(4) pseudo device</td>
 		<td>293</td>
 		<td><a href="https://github.com/freebsd/freebsd/tree/master/tests/sys/auditpipe">Merged</a></td>
 	</tr>
@@ -51,7 +51,7 @@ FreeBSD is a rapidly developing operating system with an extreme focus on advanc
 ## Project Description
 The project aims to develop a regression test-suite, which will evaluate the audit framework for proper logging of most auditable system calls classified in TCP/IP & UDP sockets, File I/O, process control and device management, along with the semantics of audit trail's BSM/XML/text output.
 
-BSM tokens can be obtained via I/O multiplexing on a special clonable device `/dev/auditpipe`, by configuring various preselection parameters for local mode auditing with the provided IOCTLs. Several `libbsm(3)` APIs and functions within the FreeBSD kernel can be used to analyse syscall tokens in the audit record. Finally, `kyua(1)`'s run-time engine will be used to automate regression testing of entire operating system at once, `audit(4)` included.
+BSM tokens can be obtained via I/O multiplexing on a special clonable device `/dev/auditpipe`, by configuring various preselection parameters for local mode auditing with the provided IOCTLs. Several `libbsm(3)` APIs and functions within the FreeBSD kernel can be used to analyse syscall tokens in the audit record. Finally, `kyua(7)`'s run-time engine will be used to automate regression testing of entire operating system at once, `audit(4)` included.
 
 ## Installation and Usage
 For FreeBSD **12-CURRENT** users, all verified tests in the Audit Test-Suite have already been merged in Head, starting with [r334360](https://github.com/freebsd/freebsd/commit/c6edf8b386ffcad33c5814a6ad5129aa8b13179e).
@@ -152,5 +152,17 @@ External repositories involved in the project apart from [freebsd source](https:
 * [jmmv/kyua](https://github.com/jmmv/kyua.git)
 * [openbsm/openbsm](https://github.com/openbsm/openbsm.git)
 
+Note: The IRC chat is available [here](https://github.com/aniketp/irc-gsoc/blob/master/logs/aniket/efnet.port80.se/%23audit-testing.log).
+
 ## License
 This project is licensed under the BSD-2-Clause License - see the [LICENSE](./LICENSE) file for details.
+
+## Acknowledgement
+I am grateful to my mentors, **Alan Somers**, **George Neville-Neil** and **Robert Watson** for the prompt-responses and the guidance they provided during the summer. It was an awesome feeling to be mentored by some of the best people of FreeBSD community. I would definitely be in touch with them and would be glad to receive their guidance in the future as well! 
+
+Also thanks to **Shivansh** for introducing me to FreeBSD! Looking at the work he did in the past two years (links above) gave me a definite edge in being able to adequately formulate my proposal and complete it in due time. Thanks to **Mateusz Piotrowski** and **Domagoj Stolfa** for valuable inputs at the various stages of my project whenever I was stuck. It has been a tremendous learning experience and definitely something way more than I could have expected for a summer! I look forward to continue the work on improving the audit(4) subsystem and also exploring various other sections of FreeBSD.
+
+In the end, thanks to The FreeBSD Project for accepting my proposal and welcoming me into their community!
+
+> Aniket Pandey
+

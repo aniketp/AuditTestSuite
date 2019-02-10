@@ -1,5 +1,5 @@
 # Regression Test-Suite for Audit Framework
-An implementation of regression testsuite for FreeBSD's audit subsystem. Made as part of [GSoC'18 with FreeBSD](https://summerofcode.withgoogle.com/projects/#4696891313356800). <br/>
+An implementation of regression testsuite for FreeBSD's audit subsystem. Made as part of [GSoC'18 with FreeBSD](https://summerofcode.withgoogle.com/archive/2018/projects/5826052001628160/). <br/>
 **For a complete overview and further updates on the project, checkout the [Project Wiki](https://wiki.freebsd.org/SummerOfCode2018Projects/RegressionTestSuiteForAuditFramework)**.
 
 ## Project Status
@@ -152,7 +152,6 @@ External repositories involved in the project apart from [freebsd source](https:
 * [jmmv/kyua](https://github.com/jmmv/kyua.git)
 * [openbsm/openbsm](https://github.com/openbsm/openbsm.git)
 
-Note: The IRC chat is available [here](https://github.com/aniketp/irc-gsoc/blob/master/logs/aniket/efnet.port80.se/%23audit-testing.log).
 
 ## License
 This project is licensed under the BSD-2-Clause License - see the [LICENSE](./LICENSE) file for details.
